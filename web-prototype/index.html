@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>NORDKAPP Prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>NORDKAPP — Prototype</h1>
+      <div id="clock">—</div>
+    </header>
+
+    <main>
+      <section id="left">
+        <div id="map-wrap">
+          <img id="map" src="../media/Europe2jpg.jpg" alt="Map Europe">
+          <div id="markers"></div>
+        </div>
+
+        <div id="controls">
+          <label>Timeline
+            <input id="timeline" type="range" min="0" max="0" step="1" value="0">
+          </label>
+          <div id="time-info"></div>
+          <!-- play button removed; speed control moved under video -->
+        </div>
+      </section>
+
+      <section id="right">
+        <div id="video-wrap">
+          <video id="player" controls playsinline></video>
+          <div id="video-rate">
+            <label>Vitesse
+              <input id="rate" type="range" min="0.25" max="4" step="0.25" value="1">
+            </label>
+          </div>
+        </div>
+
+        <div id="photo-wrap">
+          <div id="carousel-controls">
+            <button id="prevPhoto">◀</button>
+            <div id="carousel" aria-label="carousel"></div>
+            <button id="nextPhoto">▶</button>
+          </div>
+          <div id="active-photo">
+            <img id="active-photo-img" src="" alt="photo active">
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <small>Prototype — attendre l'export des images (frames) dans <code>media/frames/</code></small>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
