@@ -1,62 +1,78 @@
 <!doctype html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>NORDKAPP Prototype</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NORDKAPP</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>NORDKAPP — Prototype</h1>
-      <div id="clock">—</div>
-    </header>
 
-    <main>
-      <section id="left">
-        <div id="map-wrap">
-          <img id="map" src="../media/Europe2jpg.jpg" alt="Map Europe">
-          <div id="markers"></div>
+  <div id="map"></div>
+
+  <header id="title-bar">
+    <div id="title-main">NORDKAPP</div>
+    <div id="title-sub">17 juin — 10 juillet</div>
+  </header>
+
+  <!-- ── PANEL ── -->
+  <aside id="panel">
+    <button id="panel-close" title="Fermer">✕</button>
+
+    <div id="panel-date">
+      <span id="date-day"></span>
+      <span id="date-month"></span>
+      <span id="date-time"></span>
+    </div>
+
+    <div id="video-wrap">
+      <video id="player" controls playsinline preload="metadata"></video>
+      <div id="video-toolbar">
+        <div id="rate-control">
+          <span class="speed-label">Vitesse</span>
+          <input id="rate-slider" type="range" min="0.5" max="4" step="0.5" value="1">
+          <span id="rate-display">1×</span>
         </div>
+        <button id="btn-expand-video" title="Plein écran">⤢</button>
+      </div>
+    </div>
 
-        <div id="controls">
-          <label>Timeline
-            <input id="timeline" type="range" min="0" max="0" step="1" value="0">
-          </label>
-          <div id="time-info"></div>
-          <!-- play button removed; speed control moved under video -->
-        </div>
-      </section>
+    <nav id="nav-bar">
+      <button id="prev-btn">← Préc.</button>
+      <span id="entry-count"></span>
+      <button id="next-btn">Suiv. →</button>
+    </nav>
+  </aside>
 
-      <section id="right">
-        <div id="video-wrap">
-          <video id="player" controls playsinline></video>
-          <div id="video-rate">
-            <label>Vitesse
-              <input id="rate" type="range" min="0.25" max="4" step="0.25" value="1">
-            </label>
-          </div>
-        </div>
-
-        <div id="photo-wrap">
-          <div id="carousel-controls">
-            <button id="prevPhoto">◀</button>
-            <div id="carousel" aria-label="carousel"></div>
-            <button id="nextPhoto">▶</button>
-          </div>
-          <div id="active-photo">
-            <img id="active-photo-img" src="" alt="photo active">
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer>
-      <small>Prototype — attendre l'export des images (frames) dans <code>media/frames/</code></small>
-    </footer>
+  <!-- ── LIGHTBOX ── -->
+  <div id="lightbox" hidden>
+    <div id="lightbox-backdrop"></div>
+    <button id="lightbox-close">✕</button>
+    <button id="lightbox-prev">‹</button>
+    <div id="lightbox-img-wrap">
+      <img id="lightbox-img" src="" alt="">
+    </div>
+    <button id="lightbox-next">›</button>
+    <div id="lightbox-caption"></div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- ── TIMELINE ── -->
+  <div id="bottom-bar">
+    <div id="timeline-bar">
+      <span class="tl-edge-label">17 juin</span>
+      <div id="timeline-wrap">
+        <div id="timeline-cities-row"></div>
+        <div id="timeline-slider-wrap">
+          <input id="timeline-input" type="range" min="0" max="1" step="1" value="0">
+          <div id="timeline-thumb-label"></div>
+        </div>
+      </div>
+      <span class="tl-edge-label">10 juil.</span>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js?v=1774644033"></script>
 </body>
 </html>
