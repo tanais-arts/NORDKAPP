@@ -11,6 +11,13 @@
 
   <div id="map"></div>
 
+  <!-- ── PHOTO BAR ── -->
+  <div id="photo-bar">
+    <button class="carousel-arrow" id="carousel-prev">&#8249;</button>
+    <div id="photo-carousel"></div>
+    <button class="carousel-arrow" id="carousel-next">&#8249;</button>
+  </div>
+
   <header id="title-bar">
     <div id="title-main">NORDKAPP</div>
     <div id="title-sub">17 juin — 10 juillet 2024</div>
@@ -21,7 +28,7 @@
     <button id="panel-close" title="Fermer"></button>
 
     <div id="video-wrap">
-      <video id="player" controls playsinline preload="metadata"></video>
+      <video id="player" controls playsinline preload="none"></video>
       <div id="video-toolbar">
         <div id="rate-control">
           <span class="speed-label">Vitesse</span>
@@ -49,7 +56,7 @@
       <img id="lightbox-img" src="" alt="">
     </div>
     <button id="lightbox-next">›</button>
-    <div id="lightbox-caption"></div>
+    <div id="lb-progress"><div id="lb-progress-bar"></div></div>
   </div>
 
   <!-- ── TIMELINE ── -->

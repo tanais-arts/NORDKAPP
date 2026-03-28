@@ -25,6 +25,8 @@ const state = {
   markers:      [],
   lbPhotos:     [],
   lbIdx:        0,
+  thumbEls:     [],
+  activePhotoIdx: null,
 };
 
 // ── Map ──────────────────────────────────────────────────────────────
@@ -51,7 +53,6 @@ const tlThumbLabel = document.getElementById('timeline-thumb-label');
 const tlCitiesRow  = document.getElementById('timeline-cities-row');
 const lightbox     = document.getElementById('lightbox');
 const lbImg        = document.getElementById('lightbox-img');
-const lbCaption    = document.getElementById('lightbox-caption');
 
 // ── Panel ─────────────────────────────────────────────────────────────
 function openPanel()  { document.body.classList.add('panel-open'); }
@@ -77,8 +78,11 @@ function closeLightbox() { lightbox.hidden = true; }
 function lbShowCurrent() {
   const item = state.lbPhotos[state.lbIdx];
   if (!item) return;
+  const prog = document.getElementById('lb-progress');
+  prog.classList.add('active');
+  lbImg.onload  = () => prog.classList.remove('active');
+  lbImg.onerror = () => prog.classList.remove('active');
   lbImg.src = item.src;
-  lbCaption.textContent = item.caption ?? '';
   document.getElementById('lightbox-prev').style.visibility = state.lbIdx > 0 ? '' : 'hidden';
   document.getElementById('lightbox-next').style.visibility = state.lbIdx < state.lbPhotos.length - 1 ? '' : 'hidden';
 }
@@ -112,6 +116,33 @@ function buildTimelineCities(cities, totalEntries) {
   });
 }
 
+// ── Carousel ──────────────────────────────────────────────────────────
+const THUMB_STEP = 124; // 120px + 4px gap
+
+function nearestPhotoIdx(entryIdx) {
+  const photos = state.photos;
+  let lo = 0, hi = photos.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (photos[mid].entryIdx < entryIdx) lo = mid + 1;
+    else hi = mid;
+  }
+  const a = lo > 0 ? lo - 1 : 0;
+  const b = lo < photos.length ? lo : photos.length - 1;
+  return Math.abs(photos[a].entryIdx - entryIdx) <= Math.abs(photos[b].entryIdx - entryIdx) ? a : b;
+}
+
+function scrollCarouselTo(pi) {
+  if (pi === state.activePhotoIdx) return;
+  const carousel = document.getElementById('photo-carousel');
+  carousel.scrollTo({ left: pi * THUMB_STEP + THUMB_STEP / 2, behavior: 'smooth' });
+  const prev = state.thumbEls[state.activePhotoIdx];
+  if (prev) { prev.classList.remove('active'); prev.fetchPriority = 'low'; }
+  const next = state.thumbEls[pi];
+  if (next) { next.classList.add('active'); next.fetchPriority = 'high'; next.loading = 'eager'; }
+  state.activePhotoIdx = pi;
+}
+
 // ── Select entry ─────────────────────────────────────────────────────
 function selectEntry(idx) {
   const entries = state.entries;
@@ -128,6 +159,7 @@ function selectEntry(idx) {
   });
 
   showRing([e.lat, e.lon]);
+  scrollCarouselTo(nearestPhotoIdx(idx));
   if (!map.getBounds().contains([e.lat, e.lon])) {
     map.panTo([e.lat, e.lon], { animate: true, duration: 0.4 });
   }
@@ -187,6 +219,21 @@ async function init() {
   state.photos  = photos;
   state.cities  = cities;
 
+  // Carousel
+  const carousel = document.getElementById('photo-carousel');
+  const fragment = document.createDocumentFragment();
+  photos.forEach((p, i) => {
+    const img = document.createElement('img');
+    img.src = p.thumb || p.src;
+    img.className = 'photo-thumb';
+    img.loading = 'lazy';
+    img.draggable = false;
+    img.addEventListener('click', () => openLightbox(photos, i));
+    fragment.appendChild(img);
+  });
+  carousel.appendChild(fragment);
+  state.thumbEls = Array.from(carousel.querySelectorAll('.photo-thumb'));
+
   // Nearest entryIdx for each city
   cities.forEach(c => {
     let best = 0, bestD = Infinity;
@@ -241,6 +288,11 @@ async function init() {
 
   // Panel controls
   document.getElementById('panel-close').addEventListener('click', () => { closePanel(); player.pause(); });
+
+  // Carousel arrows
+  const carouselEl = document.getElementById('photo-carousel');
+  document.getElementById('carousel-prev').addEventListener('click', () => carouselEl.scrollBy({ left: -4 * THUMB_STEP, behavior: 'smooth' }));
+  document.getElementById('carousel-next').addEventListener('click', () => carouselEl.scrollBy({ left:  4 * THUMB_STEP, behavior: 'smooth' }));
 
   // Rate
   const rateSlider  = document.getElementById('rate-slider');
