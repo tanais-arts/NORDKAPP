@@ -344,6 +344,73 @@ async function init() {
     stageRateBtn.textContent = `${next}×`;
   });
 
+  // ── Mobile landscape ──────────────────────────────────
+  const mobileLeft   = document.getElementById('mobile-left');
+  const mobBtnVideo  = document.getElementById('mob-btn-video');
+  const mobBtnPhotos = document.getElementById('mob-btn-photos');
+  const mqlMobile    = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
+
+  let mobilePhotoStrip = null;
+
+  function isMobileLandscape() { return mqlMobile.matches; }
+
+  function enterMobileLandscape() {
+    mobileLeft.appendChild(player);
+    map.setMaxBounds(routeBounds);
+    setTimeout(() => {
+      map.invalidateSize();
+      if (state.activeIdx !== null) map.panTo([entries[state.activeIdx].lat, entries[state.activeIdx].lon]);
+    }, 50);
+  }
+
+  function exitMobileLandscape() {
+    videoWrap.insertBefore(player, toolbar);
+    map.setMaxBounds(null);
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+
+  function buildMobilePhotoStrip() {
+    if (mobilePhotoStrip) return;
+    mobilePhotoStrip = document.createElement('div');
+    mobilePhotoStrip.className = 'mob-photo-strip';
+    photos.forEach((p, i) => {
+      const img = document.createElement('img');
+      img.src = p.thumb || p.src;
+      img.loading = 'lazy';
+      img.draggable = false;
+      img.addEventListener('click', () => openLightbox(photos, i));
+      mobilePhotoStrip.appendChild(img);
+    });
+  }
+
+  function mobShowVideo() {
+    mobBtnVideo.classList.add('active');
+    mobBtnPhotos.classList.remove('active');
+    if (mobilePhotoStrip && mobileLeft.contains(mobilePhotoStrip)) mobileLeft.removeChild(mobilePhotoStrip);
+    mobileLeft.appendChild(player);
+  }
+
+  function mobShowPhotos() {
+    mobBtnPhotos.classList.add('active');
+    mobBtnVideo.classList.remove('active');
+    if (mobileLeft.contains(player)) mobileLeft.removeChild(player);
+    buildMobilePhotoStrip();
+    mobileLeft.appendChild(mobilePhotoStrip);
+    if (state.activePhotoIdx !== null) {
+      const step = 124;
+      mobilePhotoStrip.scrollTo({ left: state.activePhotoIdx * step + step / 2, behavior: 'smooth' });
+    }
+  }
+
+  mobBtnVideo.addEventListener('click', mobShowVideo);
+  mobBtnPhotos.addEventListener('click', mobShowPhotos);
+
+  mqlMobile.addEventListener('change', e => {
+    if (e.matches) enterMobileLandscape();
+    else exitMobileLandscape();
+  });
+  if (isMobileLandscape()) enterMobileLandscape();
+
   // Keyboard
   document.addEventListener('keydown', ev => {
     if (!lightbox.hidden) {

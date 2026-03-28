@@ -26,16 +26,65 @@
 }
 
 /* ── MOBILE LANDSCAPE ───────────────────────────────── */
+#mobile-title-bar, #mobile-toggle, #mobile-left { display: none; }
+
 @media (orientation: landscape) and (max-height: 500px) {
-  #photo-bar, #photo-bar * { height: 70px; }
-  .photo-thumb { height: 54px; width: 81px; }
-  #map { top: 70px; bottom: 70px; }
-  #timeline-bar { height: 70px; }
+  /* Masquer les éléments desktop */
+  #photo-bar, #title-bar, #panel, #btn-immersive { display: none !important; }
   #timeline-cities-row { display: none; }
-  #panel { width: 300px; }
-  #btn-immersive { display: none; }
-  #title-main { font-size: 1rem; }
-  #title-sub  { font-size: 0.65rem; }
+
+  /* Carte : côté droit */
+  #map { top: 0 !important; left: auto !important; right: 0 !important;
+         bottom: 64px !important; width: 38%; }
+  #timeline-bar { height: 64px; }
+  body.immersive .leaflet-control-attribution { display: none; }
+
+  /* Toggle Vidéo/Photos sur la carte */
+  #mobile-toggle {
+    display: flex; position: fixed; top: 8px; right: 8px; z-index: 500;
+    background: rgba(4,6,14,0.85); border-radius: 4px;
+    border: 1px solid rgba(255,255,255,0.1);
+    overflow: hidden;
+  }
+  .mob-tab {
+    background: none; border: none; color: rgba(255,255,255,0.45);
+    padding: 5px 10px; font-size: 0.7rem; letter-spacing: 0.07em;
+    cursor: pointer; transition: color 0.15s, background 0.15s;
+  }
+  .mob-tab.active { background: rgba(240,192,96,0.15); color: #f0c060; }
+
+  /* Titre mobile */
+  #mobile-title-bar {
+    display: flex; position: fixed; top: 0; left: 0;
+    width: 62%; height: 32px; z-index: 500; align-items: center;
+    padding: 0 12px;
+    background: rgba(4,6,14,0.7);
+  }
+  #mobile-title-bar span {
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.2em;
+    color: rgba(255,255,255,0.7); text-transform: uppercase;
+  }
+
+  /* Zone gauche : vidéo ou photos */
+  #mobile-left {
+    display: flex; position: fixed;
+    top: 32px; left: 0; right: 38%; bottom: 64px;
+    background: #000; align-items: center; justify-content: center;
+    z-index: 300;
+  }
+  #mobile-left video { width: 100%; height: 100%; object-fit: contain; }
+  #mobile-left .mob-photo-strip {
+    display: flex; align-items: center; height: 100%;
+    overflow-x: scroll; scroll-behavior: smooth; scrollbar-width: none;
+    gap: 3px; padding: 0 50%;
+  }
+  #mobile-left .mob-photo-strip::-webkit-scrollbar { display: none; }
+  #mobile-left .mob-photo-strip img {
+    flex-shrink: 0; height: calc(100% - 12px);
+    width: auto; object-fit: cover; border-radius: 2px;
+    cursor: pointer; opacity: 0.9;
+  }
+  #mobile-left .mob-photo-strip img.active { outline: 2px solid #f0c060; }
 }
 
 html, body {
