@@ -303,10 +303,45 @@ async function init() {
     player.playbackRate = r;
   });
 
-  // Expand video
-  document.getElementById('btn-expand-video').addEventListener('click', () => {
-    if (player.requestFullscreen) player.requestFullscreen();
-    else if (player.webkitRequestFullscreen) player.webkitRequestFullscreen();
+  // Mode immersif
+  const stage     = document.getElementById('video-stage');
+  const videoWrap = document.getElementById('video-wrap');
+  const toolbar   = document.getElementById('video-toolbar');
+  const rateRates = [0.5, 1, 1.5, 2, 3, 4];
+
+  const routeBounds = L.latLngBounds(entries.map(e => [e.lat, e.lon])).pad(0.15);
+
+  function enterImmersive() {
+    stage.appendChild(player);
+    document.body.classList.add('immersive');
+    map.setMaxBounds(routeBounds);
+    setTimeout(() => {
+      map.invalidateSize();
+      if (state.activeIdx !== null) {
+        const e = state.entries[state.activeIdx];
+        map.panTo([e.lat, e.lon]);
+      }
+    }, 50);
+  }
+
+  function exitImmersive() {
+    videoWrap.insertBefore(player, toolbar);
+    document.body.classList.remove('immersive');
+    map.setMaxBounds(null);
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+
+  document.getElementById('btn-immersive').addEventListener('click', enterImmersive);
+  document.getElementById('btn-exit-immersive').addEventListener('click', exitImmersive);
+
+  const stageRateBtn = document.getElementById('stage-rate-btn');
+  stageRateBtn.addEventListener('click', () => {
+    const cur = rateRates.indexOf(parseFloat(stageRateBtn.textContent));
+    const next = rateRates[(cur + 1) % rateRates.length];
+    player.playbackRate = next;
+    document.getElementById('rate-display').textContent = `${next}×`;
+    document.getElementById('rate-slider').value = next;
+    stageRateBtn.textContent = `${next}×`;
   });
 
   // Keyboard
@@ -320,7 +355,10 @@ async function init() {
     if (state.activeIdx === null) return;
     if      (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') { ev.preventDefault(); if (state.activeIdx < entries.length - 1) selectEntry(state.activeIdx + 1); }
     else if (ev.key === 'ArrowLeft'  || ev.key === 'ArrowUp')   { ev.preventDefault(); if (state.activeIdx > 0) selectEntry(state.activeIdx - 1); }
-    else if (ev.key === 'Escape') { closePanel(); player.pause(); }
+    else if (ev.key === 'Escape') {
+      if (document.body.classList.contains('immersive')) exitImmersive();
+      else { closePanel(); player.pause(); }
+    }
   });
 }
 
