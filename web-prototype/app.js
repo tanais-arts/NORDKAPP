@@ -42,7 +42,7 @@ L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const player       = document.getElementById('player');
-const entryCount   = document.getElementById('entry-count');
+const preloader    = document.getElementById('preloader');
 const dateDay      = document.getElementById('date-day');
 const dateMonth    = document.getElementById('date-month');
 const dateTime     = document.getElementById('date-time');
@@ -54,8 +54,8 @@ const lbImg        = document.getElementById('lightbox-img');
 const lbCaption    = document.getElementById('lightbox-caption');
 
 // ── Panel ─────────────────────────────────────────────────────────────
-function openPanel()  { document.body.classList.add('panel-open');  setTimeout(() => map.invalidateSize(), 390); }
-function closePanel() { document.body.classList.remove('panel-open'); setTimeout(() => map.invalidateSize(), 390); }
+function openPanel()  { document.body.classList.add('panel-open'); }
+function closePanel() { document.body.classList.remove('panel-open'); }
 
 // ── Ring marker ──────────────────────────────────────────────────────
 function showRing(latlng) {
@@ -102,7 +102,7 @@ function updateTimelineThumb(idx) {
 
 function buildTimelineCities(cities, totalEntries) {
   tlCitiesRow.innerHTML = '';
-  cities.filter(c => c.level === 1 && c.entryIdx != null).forEach(c => {
+  cities.filter(c => c.entryIdx != null).forEach(c => {
     const pct = (c.entryIdx / (totalEntries - 1)) * 100;
     const div = document.createElement('div');
     div.className = 'tl-city-tick';
@@ -128,7 +128,9 @@ function selectEntry(idx) {
   });
 
   showRing([e.lat, e.lon]);
-  map.panTo([e.lat, e.lon], { animate: true, duration: 0.5 });
+  if (!map.getBounds().contains([e.lat, e.lon])) {
+    map.panTo([e.lat, e.lon], { animate: true, duration: 0.4 });
+  }
 
   openPanel();
   updatePanel(e, idx);
@@ -149,6 +151,12 @@ function updatePanel(e, idx) {
     player.src = e.url;
     player.load();
   }
+  // Précharger la vidéo suivante
+  const nextE = state.entries[idx + 1];
+  if (nextE && preloader.src !== nextE.url) {
+    preloader.src = nextE.url;
+    preloader.load();
+  }
   player.onloadeddata = () => {
     player.playbackRate = currentRate();
     player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
@@ -158,17 +166,17 @@ function updatePanel(e, idx) {
     if (next < entries.length) selectEntry(next);
   };
 
-  entryCount.textContent = `${idx + 1} / ${entries.length}`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
 async function init() {
-  let entries, photos, cities;
+  let entries, photos, cities, visited;
   try {
-    [entries, photos, cities] = await Promise.all([
+    [entries, photos, cities, visited] = await Promise.all([
       fetch('travel.json?v=1774643824').then(r => r.json()),
       fetch('photos.json?v=1774643824').then(r => r.json()),
       fetch('cities.json?v=1774643824').then(r => r.json()),
+      fetch('visited.json').then(r => r.json()),
     ]);
   } catch (err) {
     console.error('Impossible de charger les données', err);
@@ -208,29 +216,23 @@ async function init() {
   });
 
 
-  map.fitBounds(L.latLngBounds(latlngs), { padding: [60,60] });
+  map.fitBounds(L.latLngBounds(latlngs), { padding: [20,20] });
 
-  // City labels on map
-  const cityLayers = { 1: L.layerGroup(), 2: L.layerGroup(), 3: L.layerGroup() };
-  const ZOOM_MIN   = { 1: 5, 2: 8, 3: 11 };
-  cities.forEach(c => {
+  // Visited city labels
+  visited.forEach(c => {
     L.marker([c.lat, c.lon], {
-      icon: L.divIcon({ className: `city-label level-${c.level}`, html: c.name, iconAnchor: [0,0] }),
+      icon: L.divIcon({ className: 'city-label', html: c.name, iconAnchor: [0, 0] }),
       interactive: false,
-    }).addTo(cityLayers[c.level]);
+    }).addTo(map);
   });
-  function updateCityLayers() {
-    const z = map.getZoom();
-    [1,2,3].forEach(lvl => z >= ZOOM_MIN[lvl] ? map.addLayer(cityLayers[lvl]) : map.removeLayer(cityLayers[lvl]));
-  }
-  map.on('zoomend', updateCityLayers);
-  updateCityLayers();
+
 
 
   // Timeline
   tlInput.max = entries.length - 1;
   tlInput.value = 0;
-  buildTimelineCities(cities, entries.length);
+  updateTimelineThumb(0);
+  buildTimelineCities(visited, entries.length);
   tlInput.addEventListener('input', () => {
     const idx = Number(tlInput.value);
     updateTimelineThumb(idx);
@@ -239,8 +241,6 @@ async function init() {
 
   // Panel controls
   document.getElementById('panel-close').addEventListener('click', () => { closePanel(); player.pause(); });
-  document.getElementById('prev-btn').addEventListener('click', () => { if (state.activeIdx > 0) selectEntry(state.activeIdx - 1); });
-  document.getElementById('next-btn').addEventListener('click', () => { if (state.activeIdx < entries.length - 1) selectEntry(state.activeIdx + 1); });
 
   // Rate
   const rateSlider  = document.getElementById('rate-slider');

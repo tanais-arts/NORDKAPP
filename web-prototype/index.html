@@ -13,18 +13,12 @@
 
   <header id="title-bar">
     <div id="title-main">NORDKAPP</div>
-    <div id="title-sub">17 juin — 10 juillet</div>
+    <div id="title-sub">17 juin — 10 juillet 2024</div>
   </header>
 
   <!-- ── PANEL ── -->
   <aside id="panel">
-    <button id="panel-close" title="Fermer">✕</button>
-
-    <div id="panel-date">
-      <span id="date-day"></span>
-      <span id="date-month"></span>
-      <span id="date-time"></span>
-    </div>
+    <button id="panel-close" title="Fermer"></button>
 
     <div id="video-wrap">
       <video id="player" controls playsinline preload="metadata"></video>
@@ -38,11 +32,12 @@
       </div>
     </div>
 
-    <nav id="nav-bar">
-      <button id="prev-btn">← Préc.</button>
-      <span id="entry-count"></span>
-      <button id="next-btn">Suiv. →</button>
-    </nav>
+    <div id="panel-date">
+      <span id="date-day"></span>
+      <span id="date-month"></span>
+      <span id="date-year">2024</span>
+      <span id="date-time"></span>
+    </div>
   </aside>
 
   <!-- ── LIGHTBOX ── -->
@@ -64,7 +59,7 @@
       <div id="timeline-wrap">
         <div id="timeline-cities-row"></div>
         <div id="timeline-slider-wrap">
-          <input id="timeline-input" type="range" min="0" max="1" step="1" value="0">
+          <input id="timeline-input" type="range" min="0" max="1" step="1" value="0" autocomplete="off">
           <div id="timeline-thumb-label"></div>
         </div>
       </div>
@@ -72,6 +67,7 @@
     </div>
   </div>
 
+  <video id="preloader" preload="auto" style="display:none"></video>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="app.js?v=1774644033"></script>
 </body>
