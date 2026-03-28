@@ -82,7 +82,7 @@ function lbShowCurrent() {
   prog.classList.add('active');
   lbImg.onload  = () => prog.classList.remove('active');
   lbImg.onerror = () => prog.classList.remove('active');
-  lbImg.src = item.src;
+  lbImg.src = item.webp || item.src;
   document.getElementById('lightbox-prev').style.visibility = state.lbIdx > 0 ? '' : 'hidden';
   document.getElementById('lightbox-next').style.visibility = state.lbIdx < state.lbPhotos.length - 1 ? '' : 'hidden';
 }
