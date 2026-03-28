@@ -1,5 +1,43 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── ROTATE OVERLAY ─────────────────────────────────── */
+#rotate-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 9999;
+  background: #080c14;
+  align-items: center; justify-content: center;
+}
+#rotate-content { text-align: center; }
+#rotate-icon {
+  font-size: 4rem; color: #f0c060;
+  display: block; margin-bottom: 20px;
+  animation: rotate-hint 2s ease-in-out infinite;
+}
+@keyframes rotate-hint {
+  0%, 100% { transform: rotate(0deg); }
+  40%       { transform: rotate(90deg); }
+  60%       { transform: rotate(90deg); }
+}
+#rotate-msg { font-size: 1.3rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
+#rotate-sub { font-size: 0.85rem; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; }
+
+@media (orientation: portrait) and (max-width: 1024px) {
+  #rotate-overlay { display: flex; }
+}
+
+/* ── MOBILE LANDSCAPE ───────────────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  #photo-bar, #photo-bar * { height: 70px; }
+  .photo-thumb { height: 54px; width: 81px; }
+  #map { top: 70px; bottom: 70px; }
+  #timeline-bar { height: 70px; }
+  #timeline-cities-row { display: none; }
+  #panel { width: 300px; }
+  #btn-immersive { display: none; }
+  #title-main { font-size: 1rem; }
+  #title-sub  { font-size: 0.65rem; }
+}
+
 html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
