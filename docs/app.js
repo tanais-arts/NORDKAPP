@@ -30,8 +30,6 @@ const state = {
 };
 
 // ── Map ──────────────────────────────────────────────────────────────
-const renderer = L.canvas({ padding: 0.5 });
-
 const map = L.map('map', { zoomControl: false, attributionControl: true })
   .setView([55, 10], 5);
 
@@ -92,6 +90,7 @@ function lbShowCurrent() {
   tryNext();
   document.getElementById('lightbox-prev').style.visibility = state.lbIdx > 0 ? '' : 'hidden';
   document.getElementById('lightbox-next').style.visibility = state.lbIdx < state.lbPhotos.length - 1 ? '' : 'hidden';
+  document.getElementById('lb-counter').textContent = `${state.lbIdx + 1} / ${state.lbPhotos.length}`;
 }
 
 document.getElementById('lightbox-backdrop').addEventListener('click', closeLightbox);
@@ -161,14 +160,6 @@ function selectEntry(idx) {
   const e = entries[idx];
   state.activeIdx = idx;
 
-  state.markers.forEach((m, i) => {
-    m.setStyle({
-      fillColor:   i === idx ? '#fff' : DOT_COLOR,
-      radius:      i === idx ? DOT_ACTIVE : DOT_RADIUS,
-      fillOpacity: i === idx ? 1 : 0.75,
-    });
-  });
-
   showRing([e.lat, e.lon]);
   scrollCarouselTo(nearestPhotoIdx(idx));
   if (!map.getBounds().contains([e.lat, e.lon])) {
@@ -200,7 +191,7 @@ function updatePanel(e, idx) {
     preloader.src = nextE.url;
     preloader.load();
   }
-  player.onloadeddata = () => {
+  player.oncanplay = () => {
     player.playbackRate = currentRate();
     player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
   };
@@ -216,9 +207,9 @@ async function init() {
   let entries, photos, cities, visited;
   try {
     [entries, photos, cities, visited] = await Promise.all([
-      fetch('travel.json?v=1774643824').then(r => r.json()),
-      fetch('photos.json?v=1774643824').then(r => r.json()),
-      fetch('cities.json?v=1774643824').then(r => r.json()),
+      fetch('travel.json?v=1774802661').then(r => r.json()),
+      fetch('photos.json?v=1774802661').then(r => r.json()),
+      fetch('cities.json?v=1774802661').then(r => r.json()),
       fetch('visited.json').then(r => r.json()),
     ]);
   } catch (err) {
@@ -267,23 +258,42 @@ async function init() {
   assignEntryIdx(cities);
   assignEntryIdx(visited);
 
-  // Route polyline
-  const latlngs = entries.map(e => [e.lat, e.lon]);
-  L.polyline(latlngs, { color: ACCENT, weight: 1.5, opacity: 0.45, smoothFactor: 1.5 }).addTo(map);
+  // Route polylines — ligne épaisse sur segments vidéo, fine+tirets sur segments interpolés
+  const findNearestEntry = (latlng) => {
+    let best = 0, bestD = Infinity;
+    entries.forEach((e, i) => {
+      const d = (e.lat - latlng.lat) ** 2 + (e.lon - latlng.lng) ** 2;
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  };
 
-  // Video markers (canvas)
-  state.markers = entries.map((e, i) => {
-    const m = L.circleMarker([e.lat, e.lon], {
-      renderer, radius: DOT_RADIUS, fillColor: DOT_COLOR,
-      fillOpacity: 0.75, color: 'rgba(0,0,0,0.4)', weight: 0.5,
-    }).addTo(map);
-    m.on('click', () => selectEntry(i));
-    m.bindTooltip(
-      `<b>${e.day} ${MONTHS_FR[e.month]}</b> · ${e.hour}h${String(e.minute).padStart(2,'0')}`,
-      { direction: 'top', offset: [0,-6], opacity: 0.9 }
-    );
-    return m;
+  const latlngs = entries.map(e => [e.lat, e.lon]);
+  let curSeg = [], curInterp = null;
+  const flushSeg = (interp) => {
+    if (curSeg.length < 2) return;
+    if (interp) {
+      L.polyline(curSeg, { color: ACCENT, weight: 1.5, opacity: 0.35, smoothFactor: 2, dashArray: '4 7' }).addTo(map);
+    } else {
+      L.polyline(curSeg, { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1 })
+        .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
+        .addTo(map);
+    }
+  };
+  entries.forEach((e, i) => {
+    const interp = e.frame === 0;
+    if (curInterp === null) curInterp = interp;
+    if (interp !== curInterp) {
+      const join = curSeg[curSeg.length - 1];
+      flushSeg(curInterp);
+      curSeg = [join];
+      curInterp = interp;
+    }
+    curSeg.push([e.lat, e.lon]);
   });
+  flushSeg(curInterp);
+
+  state.markers = [];
 
 
   map.fitBounds(L.latLngBounds(latlngs), { padding: [20,20] });
