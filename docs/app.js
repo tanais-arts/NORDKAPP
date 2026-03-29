@@ -143,31 +143,36 @@ function lerpC(n, d, t) {
 }
 
 function applyDaylight(elev) {
-  // t=0 nuit profonde, t=1 plein jour — seuil: [-4°, +6°]
-  const t = Math.max(0, Math.min(1, (elev + 4) / 10));
+  // t=0 nuit profonde, t=1 soleil haut — plafonné à 0.42 : jamais de mode clair
+  // (voyage en soleil de minuit → élévation toujours élevée, on garde le côté sombre)
+  const t = Math.max(0, Math.min(0.42, (elev + 4) / 10));
   if (Math.abs(t - state.lastT) < 0.008) return;
   state.lastT = t;
   const root = document.documentElement;
-  const s = (k) => root.style.setProperty(k, lerpC(P_NIGHT[k.slice(2).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())], P_DAY[k.slice(2).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())], t));
-  root.style.setProperty('--bg',       lerpC(P_NIGHT.bg,      P_DAY.bg,      t));
-  root.style.setProperty('--chrome',   lerpC(P_NIGHT.chrome,  P_DAY.chrome,  t));
-  root.style.setProperty('--panel',    lerpC(P_NIGHT.panel,   P_DAY.panel,   t));
-  root.style.setProperty('--border',   lerpC(P_NIGHT.border,  P_DAY.border,  t));
-  root.style.setProperty('--borderf',  lerpC(P_NIGHT.borderF, P_DAY.borderF, t));
-  root.style.setProperty('--text1',    lerpC(P_NIGHT.text1,   P_DAY.text1,   t));
-  root.style.setProperty('--text2',    lerpC(P_NIGHT.text2,   P_DAY.text2,   t));
-  root.style.setProperty('--text3',    lerpC(P_NIGHT.text3,   P_DAY.text3,   t));
-  root.style.setProperty('--text4',    lerpC(P_NIGHT.text4,   P_DAY.text4,   t));
-  root.style.setProperty('--text5',    lerpC(P_NIGHT.text5,   P_DAY.text5,   t));
-  root.style.setProperty('--accT',     lerpC(P_NIGHT.accentT, P_DAY.accentT, t));
-  root.style.setProperty('--tltrack',  lerpC(P_NIGHT.tlTrack, P_DAY.tlTrack, t));
-  root.style.setProperty('--tledge',   lerpC(P_NIGHT.tlEdge,  P_DAY.tlEdge,  t));
-  root.style.setProperty('--cityc',    lerpC(P_NIGHT.cityC,   P_DAY.cityC,   t));
-  root.style.setProperty('--tickc',    lerpC(P_NIGHT.tickC,   P_DAY.tickC,   t));
-  root.style.setProperty('--zoombg',   lerpC(P_NIGHT.zoomBg,  P_DAY.zoomBg,  t));
-  root.style.setProperty('--zoomc',    lerpC(P_NIGHT.zoomC,   P_DAY.zoomC,   t));
 
-  // Basculer le fond de carte
+  // Barres haut/bas : toujours noires (--bg, --chrome épinglés sur P_NIGHT)
+  root.style.setProperty('--bg',       lerpC(P_NIGHT.bg,      P_NIGHT.bg,     0));
+  root.style.setProperty('--chrome',   lerpC(P_NIGHT.chrome,  P_NIGHT.chrome, 0));
+
+  // Le reste se réchauffe légèrement selon l'élévation solaire
+  root.style.setProperty('--panel',    lerpC(P_NIGHT.panel,   P_DAY.panel,    t));
+  root.style.setProperty('--border',   lerpC(P_NIGHT.border,  P_DAY.border,   t));
+  root.style.setProperty('--borderf',  lerpC(P_NIGHT.borderF, P_DAY.borderF,  t));
+  root.style.setProperty('--text1',    lerpC(P_NIGHT.text1,   P_DAY.text1,    t));
+  root.style.setProperty('--text2',    lerpC(P_NIGHT.text2,   P_DAY.text2,    t));
+  root.style.setProperty('--text3',    lerpC(P_NIGHT.text3,   P_DAY.text3,    t));
+  root.style.setProperty('--text4',    lerpC(P_NIGHT.text4,   P_DAY.text4,    t));
+  root.style.setProperty('--text5',    lerpC(P_NIGHT.text5,   P_DAY.text5,    t));
+  root.style.setProperty('--accT',     lerpC(P_NIGHT.accentT, P_DAY.accentT,  t));
+  root.style.setProperty('--tltrack',  lerpC(P_NIGHT.tlTrack, P_DAY.tlTrack,  t));
+  root.style.setProperty('--tledge',   lerpC(P_NIGHT.tlEdge,  P_DAY.tlEdge,   t));
+  root.style.setProperty('--cityc',    lerpC(P_NIGHT.cityC,   P_DAY.cityC,    t));
+  root.style.setProperty('--tickc',    lerpC(P_NIGHT.tickC,   P_DAY.tickC,    t));
+  root.style.setProperty('--zoombg',   lerpC(P_NIGHT.zoomBg,  P_DAY.zoomBg,   t));
+  root.style.setProperty('--zoomc',    lerpC(P_NIGHT.zoomC,   P_DAY.zoomC,    t));
+
+  // Tuile toujours sombre (t max 0.42 < seuil 0.45 → jamais de basculement)
+  // mais on garde le mécanisme au cas où
   const useLight = t > 0.45;
   if (useLight !== state.lightTile) {
     state.lightTile = useLight;
@@ -181,8 +186,8 @@ function applyDaylight(elev) {
     line.setStyle({ color: routeColor, opacity: interp ? routeOp * 0.45 : routeOp });
   });
 
-  // Opacité du terminator : plus visible sur fond clair
-  terminator.setStyle({ fillOpacity: 0.48 + t * 0.22 });
+  // Terminator : opacité réduite quand l'ambiance est plus lumineuse
+  terminator.setStyle({ fillOpacity: 0.48 + t * 0.12 });
 }
 
 // ── Ring marker ──────────────────────────────────────────────────────
