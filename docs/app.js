@@ -8,6 +8,10 @@ const DOT_COLOR  = '#f0c060';
 const DOT_RADIUS = 4;
 const DOT_ACTIVE = 8;
 
+// ── Tiles ───────────────────────────────────────────────────────────
+const TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+
 function pad(n)        { return String(n).padStart(4, '0'); }
 function frameSrc(n)   { return `${FRAME_BASE}${pad(n)}.jpg`; }
 function currentRate() { return parseFloat(document.getElementById('rate-slider')?.value ?? 1); }
@@ -27,13 +31,16 @@ const state = {
   lbIdx:        0,
   thumbEls:     [],
   activePhotoIdx: null,
+  lightTile:    false,
+  polylines:    [],
+  lastT:        -1,
 };
 
 // ── Map ──────────────────────────────────────────────────────────────
 const map = L.map('map', { zoomControl: false, attributionControl: true })
   .setView([55, 10], 5);
 
-L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+let tileLayer = L.tileLayer(TILE_DARK, {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
   maxZoom: 19, subdomains: 'abcd',
 }).addTo(map);
@@ -55,6 +62,92 @@ const lbImg        = document.getElementById('lightbox-img');
 // ── Panel ─────────────────────────────────────────────────────────────
 function openPanel()  { document.body.classList.add('panel-open'); }
 function closePanel() { document.body.classList.remove('panel-open'); }
+
+// ── Daylight theme ────────────────────────────────────────────────────
+// Voyage en CEST (UTC+2) du début à la fin
+function sunElevationDeg(lat, lon, day, month, hour, minute) {
+  const utcMin = ((hour - 2 + 24) % 24) * 60 + minute;
+  const days = [0,31,29,31,30,31,30,31,31,30,31,30,31]; // 2024 bissextile
+  let doy = day;
+  for (let m = 1; m < month; m++) doy += days[m];
+  const decl = -23.45 * Math.cos(2 * Math.PI * (doy + 10) / 365) * Math.PI / 180;
+  const solarNoon = 720 - 4 * lon; // minutes UTC
+  const H = (utcMin - solarNoon) * (Math.PI / 720);
+  const φ = lat * Math.PI / 180;
+  return Math.asin(Math.sin(φ)*Math.sin(decl) + Math.cos(φ)*Math.cos(decl)*Math.cos(H)) * 180/Math.PI;
+}
+
+// Palettes [r, g, b, a]
+const P_NIGHT = {
+  bg:       [8,12,20,1],      chrome:   [4,6,14,0.92],    panel:    [6,9,18,0.97],
+  border:   [255,255,255,0.07], borderF: [255,255,255,0.05],
+  text1:    [240,240,240,1],  text2:    [255,255,255,0.70],
+  text3:    [255,255,255,0.45], text4:  [255,255,255,0.35],
+  text5:    [255,255,255,0.30], accentT:[240,192,96,1],
+  tlTrack:  [255,255,255,0.12], tlEdge: [255,255,255,0.30],
+  cityC:    [255,255,255,0.85], tickC:  [255,255,255,0.60],
+  zoomBg:   [8,12,20,0.85],   zoomC:   [170,170,170,1],
+  route:    [240,192,96,1],   routeOp: 0.65,
+};
+const P_DAY = {
+  bg:       [255,251,240,1],  chrome:   [255,250,242,0.93], panel:  [255,250,242,0.98],
+  border:   [0,0,0,0.08],     borderF:  [0,0,0,0.05],
+  text1:    [24,22,38,1],     text2:    [24,22,38,0.75],
+  text3:    [24,22,38,0.50],  text4:    [24,22,38,0.38],
+  text5:    [24,22,38,0.30],  accentT:  [168,96,0,1],
+  tlTrack:  [24,22,38,0.12],  tlEdge:   [24,22,38,0.30],
+  cityC:    [24,22,38,0.88],  tickC:    [24,22,38,0.55],
+  zoomBg:   [255,250,242,0.92], zoomC:  [80,70,60,1],
+  route:    [200,120,10,1],   routeOp: 0.80,
+};
+
+function lerpC(n, d, t) {
+  const r = Math.round(n[0] + (d[0]-n[0])*t);
+  const g = Math.round(n[1] + (d[1]-n[1])*t);
+  const b = Math.round(n[2] + (d[2]-n[2])*t);
+  const a = (n[3] + (d[3]-n[3])*t).toFixed(3);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function applyDaylight(elev) {
+  // t=0 nuit profonde, t=1 plein jour — seuil: [-4°, +6°]
+  const t = Math.max(0, Math.min(1, (elev + 4) / 10));
+  if (Math.abs(t - state.lastT) < 0.008) return;
+  state.lastT = t;
+  const root = document.documentElement;
+  const s = (k) => root.style.setProperty(k, lerpC(P_NIGHT[k.slice(2).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())], P_DAY[k.slice(2).replace(/-([a-z])/g,(_,c)=>c.toUpperCase())], t));
+  root.style.setProperty('--bg',       lerpC(P_NIGHT.bg,      P_DAY.bg,      t));
+  root.style.setProperty('--chrome',   lerpC(P_NIGHT.chrome,  P_DAY.chrome,  t));
+  root.style.setProperty('--panel',    lerpC(P_NIGHT.panel,   P_DAY.panel,   t));
+  root.style.setProperty('--border',   lerpC(P_NIGHT.border,  P_DAY.border,  t));
+  root.style.setProperty('--borderf',  lerpC(P_NIGHT.borderF, P_DAY.borderF, t));
+  root.style.setProperty('--text1',    lerpC(P_NIGHT.text1,   P_DAY.text1,   t));
+  root.style.setProperty('--text2',    lerpC(P_NIGHT.text2,   P_DAY.text2,   t));
+  root.style.setProperty('--text3',    lerpC(P_NIGHT.text3,   P_DAY.text3,   t));
+  root.style.setProperty('--text4',    lerpC(P_NIGHT.text4,   P_DAY.text4,   t));
+  root.style.setProperty('--text5',    lerpC(P_NIGHT.text5,   P_DAY.text5,   t));
+  root.style.setProperty('--accT',     lerpC(P_NIGHT.accentT, P_DAY.accentT, t));
+  root.style.setProperty('--tltrack',  lerpC(P_NIGHT.tlTrack, P_DAY.tlTrack, t));
+  root.style.setProperty('--tledge',   lerpC(P_NIGHT.tlEdge,  P_DAY.tlEdge,  t));
+  root.style.setProperty('--cityc',    lerpC(P_NIGHT.cityC,   P_DAY.cityC,   t));
+  root.style.setProperty('--tickc',    lerpC(P_NIGHT.tickC,   P_DAY.tickC,   t));
+  root.style.setProperty('--zoombg',   lerpC(P_NIGHT.zoomBg,  P_DAY.zoomBg,  t));
+  root.style.setProperty('--zoomc',    lerpC(P_NIGHT.zoomC,   P_DAY.zoomC,   t));
+
+  // Basculer le fond de carte
+  const useLight = t > 0.45;
+  if (useLight !== state.lightTile) {
+    state.lightTile = useLight;
+    tileLayer.setUrl(useLight ? TILE_LIGHT : TILE_DARK);
+  }
+
+  // Couleur des polylines
+  const routeColor = lerpC(P_NIGHT.route, P_DAY.route, t);
+  const routeOp    = P_NIGHT.routeOp + (P_DAY.routeOp - P_NIGHT.routeOp) * t;
+  state.polylines.forEach(({ line, interp }) => {
+    line.setStyle({ color: routeColor, opacity: interp ? routeOp * 0.45 : routeOp });
+  });
+}
 
 // ── Ring marker ──────────────────────────────────────────────────────
 function showRing(latlng) {
@@ -172,6 +265,7 @@ function selectEntry(idx) {
   state.activeIdx = idx;
 
   showRing([e.lat, e.lon]);
+  applyDaylight(sunElevationDeg(e.lat, e.lon, e.day, e.month, e.hour, e.minute));
   scrollCarouselTo(nearestPhotoIdx(idx));
   if (!map.getBounds().contains([e.lat, e.lon])) {
     map.panTo([e.lat, e.lon], { animate: true, duration: 0.4 });
@@ -219,7 +313,7 @@ async function init() {
   try {
     [entries, photos, cities, visited] = await Promise.all([
       fetch('travel.json?v=1774802661').then(r => r.json()),
-      fetch('photos.json?v=1774802661').then(r => r.json()),
+      fetch('photos.json?v=1774804575').then(r => r.json()),
       fetch('cities.json?v=1774802661').then(r => r.json()),
       fetch('visited.json').then(r => r.json()),
     ]);
@@ -283,13 +377,15 @@ async function init() {
   let curSeg = [], curInterp = null;
   const flushSeg = (interp) => {
     if (curSeg.length < 2) return;
+    let line;
     if (interp) {
-      L.polyline(curSeg, { color: ACCENT, weight: 1.5, opacity: 0.35, smoothFactor: 2, dashArray: '4 7' }).addTo(map);
+      line = L.polyline(curSeg, { color: ACCENT, weight: 1.5, opacity: 0.30, smoothFactor: 2 }).addTo(map);
     } else {
-      L.polyline(curSeg, { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1 })
+      line = L.polyline(curSeg, { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1 })
         .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
         .addTo(map);
     }
+    state.polylines.push({ line, interp });
   };
   entries.forEach((e, i) => {
     const interp = e.frame === 0;
@@ -303,6 +399,24 @@ async function init() {
     curSeg.push([e.lat, e.lon]);
   });
   flushSeg(curInterp);
+
+  // Tick labels every 10 minutes
+  let lastTick = -1;
+  entries.forEach((e, i) => {
+    const slot = e.hour * 6 + Math.floor(e.minute / 10);
+    if (slot === lastTick) return;
+    lastTick = slot;
+    const label = `${e.day} ${MONTHS_FR[e.month]} · ${e.hour}h${String(e.minute).padStart(2,'0')}`;
+    L.marker([e.lat, e.lon], {
+      icon: L.divIcon({
+        className: 'time-tick',
+        html: `<div class="time-tick-dot"></div><div class="time-tick-label">${label}</div>`,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0],
+      }),
+      interactive: true,
+    }).on('click', () => selectEntry(i)).addTo(map);
+  });
 
   state.markers = [];
 
