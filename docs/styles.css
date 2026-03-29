@@ -319,8 +319,16 @@ body.immersive .leaflet-control-attribution { display: none; }
 #lb-counter {
   font-size: 0.75rem; letter-spacing: 0.12em;
   color: rgba(255,255,255,0.45); font-weight: 600;
-  text-transform: uppercase;
+  text-transform: uppercase; flex: 1; text-align: center;
 }
+#lb-download {
+  background: none; border: none;
+  color: rgba(255,255,255,0.6); font-size: 1.6rem; line-height: 1;
+  padding: 10px 16px; cursor: pointer; border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
+  pointer-events: auto;
+}
+#lb-download:hover { background: rgba(240,192,96,0.15); color: #f0c060; }
 #lightbox-prev, #lightbox-next {
   background: none; border: none;
   color: rgba(255,255,255,0.7); font-size: 2rem; line-height: 1;
