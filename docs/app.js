@@ -202,14 +202,13 @@ function updatePanel(e, idx) {
 
 // ── Init ──────────────────────────────────────────────────────────────
 async function init() {
-  let entries, photos, cities, visited, highlights;
+  let entries, photos, cities, visited;
   try {
-    [entries, photos, cities, visited, highlights] = await Promise.all([
+    [entries, photos, cities, visited] = await Promise.all([
       fetch('travel.json?v=1774643824').then(r => r.json()),
       fetch('photos.json?v=1774643824').then(r => r.json()),
       fetch('cities.json?v=1774643824').then(r => r.json()),
       fetch('visited.json').then(r => r.json()),
-      fetch('highlights.json').then(r => r.json()),
     ]);
   } catch (err) {
     console.error('Impossible de charger les données', err);
@@ -282,22 +281,6 @@ async function init() {
   updateTimelineThumb(0);
   buildTimelineCities(visited, entries.length);
 
-  // Highlights sur la timeline
-  highlights.forEach(h => {
-    const pct = h.entryIdx / (entries.length - 1);
-    const tick = document.createElement('div');
-    tick.className = 'tl-highlight';
-    tick.style.left = `${pct * 100}%`;
-    tick.innerHTML = '<div class="hl-diamond"></div>';
-    tick.title = `${h.day.toString().padStart(2,'0')}/${h.month.toString().padStart(2,'0')} ${h.hour.toString().padStart(2,'0')}h${h.minute.toString().padStart(2,'0')}`;
-    tick.addEventListener('click', () => {
-      selectEntry(h.entryIdx);
-      player.src = h.url;
-      player.load();
-      player.onloadeddata = () => { player.playbackRate = currentRate(); player.play().catch(() => { player.muted = true; player.play().catch(() => {}); }); };
-    });
-    document.getElementById('timeline-slider-wrap').appendChild(tick);
-  });
   tlInput.addEventListener('input', () => {
     const idx = Number(tlInput.value);
     updateTimelineThumb(idx);
