@@ -283,13 +283,12 @@ async function init() {
   buildTimelineCities(visited, entries.length);
 
   // Highlights sur la timeline
-  const citiesRow = document.getElementById('timeline-cities-row');
   highlights.forEach(h => {
     const pct = h.entryIdx / (entries.length - 1);
     const tick = document.createElement('div');
     tick.className = 'tl-highlight';
     tick.style.left = `${pct * 100}%`;
-    tick.innerHTML = '<div class="hl-line"></div><div class="hl-diamond"></div>';
+    tick.innerHTML = '<div class="hl-diamond"></div>';
     tick.title = `${h.day.toString().padStart(2,'0')}/${h.month.toString().padStart(2,'0')} ${h.hour.toString().padStart(2,'0')}h${h.minute.toString().padStart(2,'0')}`;
     tick.addEventListener('click', () => {
       selectEntry(h.entryIdx);
@@ -297,7 +296,7 @@ async function init() {
       player.load();
       player.onloadeddata = () => { player.playbackRate = currentRate(); player.play().catch(() => { player.muted = true; player.play().catch(() => {}); }); };
     });
-    citiesRow.appendChild(tick);
+    document.getElementById('timeline-slider-wrap').appendChild(tick);
   });
   tlInput.addEventListener('input', () => {
     const idx = Number(tlInput.value);
