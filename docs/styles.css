@@ -311,15 +311,19 @@ body.immersive .leaflet-control-attribution { display: none; }
 #lightbox-close:hover { background: rgba(0,0,0,0.75); }
 #lightbox-prev, #lightbox-next {
   position: fixed; top: 50%; z-index: 920; transform: translateY(-50%);
-  background: rgba(255,255,255,0.07); border: none;
-  color: rgba(255,255,255,0.7); font-size: 2.5rem; line-height: 1;
-  padding: 16px 20px; cursor: pointer; border-radius: 3px;
-  transition: background 0.15s, color 0.15s;
+  background: rgba(0,0,0,0.55); border: 2px solid rgba(255,255,255,0.25);
+  color: #fff; font-size: 3rem; line-height: 1;
+  padding: 18px 24px; cursor: pointer; border-radius: 6px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   pointer-events: auto;
+  user-select: none;
 }
 #lightbox-prev { left: 16px; }
 #lightbox-next { right: 16px; }
-#lightbox-prev:hover, #lightbox-next:hover { background: rgba(240,192,96,0.2); color: #f0c060; }
+#lightbox-prev:hover, #lightbox-next:hover {
+  background: rgba(240,192,96,0.25); color: #f0c060;
+  border-color: rgba(240,192,96,0.6);
+}
 #lb-progress {
   position: fixed; bottom: 0; left: 0; right: 0; height: 3px; z-index: 930;
   background: rgba(255,255,255,0.08);
