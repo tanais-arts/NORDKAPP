@@ -1,10 +1,31 @@
+/* ── THEME VARIABLES (interpolées en JS selon élévation solaire) ─── */
+:root {
+  --bg:      rgba(8,12,20,1);
+  --chrome:  rgba(4,6,14,0.92);
+  --panel:   rgba(6,9,18,0.97);
+  --border:  rgba(255,255,255,0.07);
+  --borderf: rgba(255,255,255,0.05);
+  --text1:   rgba(240,240,240,1);
+  --text2:   rgba(255,255,255,0.70);
+  --text3:   rgba(255,255,255,0.45);
+  --text4:   rgba(255,255,255,0.35);
+  --text5:   rgba(255,255,255,0.30);
+  --accT:    rgba(240,192,96,1);
+  --tltrack: rgba(255,255,255,0.12);
+  --tledge:  rgba(255,255,255,0.30);
+  --cityc:   rgba(255,255,255,0.85);
+  --tickc:   rgba(255,255,255,0.60);
+  --zoombg:  rgba(8,12,20,0.85);
+  --zoomc:   rgba(170,170,170,1);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* ── ROTATE OVERLAY ─────────────────────────────────── */
 #rotate-overlay {
   display: none;
   position: fixed; inset: 0; z-index: 9999;
-  background: #080c14;
+  background: var(--bg);
   align-items: center; justify-content: center;
 }
 #rotate-content { text-align: center; }
@@ -18,8 +39,8 @@
   40%       { transform: rotate(90deg); }
   60%       { transform: rotate(90deg); }
 }
-#rotate-msg { font-size: 1.3rem; font-weight: 600; color: #fff; margin-bottom: 8px; }
-#rotate-sub { font-size: 0.85rem; color: rgba(255,255,255,0.4); letter-spacing: 0.08em; }
+#rotate-msg { font-size: 1.3rem; font-weight: 600; color: var(--text1); margin-bottom: 8px; }
+#rotate-sub { font-size: 0.85rem; color: var(--text4); letter-spacing: 0.08em; }
 
 @media (orientation: portrait) and (max-width: 1024px) {
   #rotate-overlay { display: flex; }
@@ -42,12 +63,12 @@
   /* Toggle Vidéo/Photos sur la carte */
   #mobile-toggle {
     display: flex; position: fixed; top: 8px; right: 8px; z-index: 500;
-    background: rgba(4,6,14,0.85); border-radius: 4px;
-    border: 1px solid rgba(255,255,255,0.1);
+    background: var(--chrome); border-radius: 4px;
+    border: 1px solid var(--border);
     overflow: hidden;
   }
   .mob-tab {
-    background: none; border: none; color: rgba(255,255,255,0.45);
+    background: none; border: none; color: var(--text3);
     padding: 5px 10px; font-size: 0.7rem; letter-spacing: 0.07em;
     cursor: pointer; transition: color 0.15s, background 0.15s;
   }
@@ -58,11 +79,11 @@
     display: flex; position: fixed; top: 0; left: 0;
     width: 62%; height: 32px; z-index: 500; align-items: center;
     padding: 0 12px;
-    background: rgba(4,6,14,0.7);
+    background: var(--chrome);
   }
   #mobile-title-bar span {
     font-size: 0.8rem; font-weight: 700; letter-spacing: 0.2em;
-    color: rgba(255,255,255,0.7); text-transform: uppercase;
+    color: var(--text2); text-transform: uppercase;
   }
 
   /* Zone gauche : vidéo ou photos */
@@ -90,18 +111,20 @@
 html, body {
   height: 100%;
   font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-  background: #080c14;
-  color: #f0f0f0;
+  background: var(--bg);
+  color: var(--text1);
   overflow: hidden;
+  transition: background 1.4s ease, color 1.4s ease;
 }
 
 /* ── PHOTO BAR ──────────────────────────────────────── */
 #photo-bar {
   position: fixed; top: 0; left: 0; right: 0;
   height: 100px; z-index: 400;
-  background: rgba(4,6,14,0.88);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: var(--chrome);
+  border-bottom: 1px solid var(--borderf);
   backdrop-filter: blur(10px);
+  transition: background 1.4s ease, border-color 1.4s ease;
 }
 #photo-carousel {
   display: flex; align-items: center;
@@ -126,7 +149,7 @@ html, body {
   position: absolute; top: 0; bottom: 0; z-index: 2;
   width: 64px; display: flex; align-items: center; justify-content: center;
   background: none; border: none;
-  color: rgba(255,255,255,0.4);
+  color: var(--text4);
   font-size: 2.2rem; cursor: pointer; transition: color 0.15s;
 }
 .carousel-arrow:hover { color: #f0c060; }
@@ -149,13 +172,13 @@ html, body {
 }
 #title-main {
   font-size: 2rem; font-weight: 900;
-  letter-spacing: 0.25em; color: #fff;
+  letter-spacing: 0.25em; color: var(--text1);
   text-shadow: 0 2px 16px rgba(0,0,0,0.9);
   line-height: 1;
 }
 #title-sub {
   margin-top: 4px; font-size: 0.75rem;
-  letter-spacing: 0.18em; color: rgba(255,255,255,0.45);
+  letter-spacing: 0.18em; color: var(--text4);
   text-transform: uppercase;
 }
 
@@ -165,13 +188,13 @@ html, body {
   position: fixed;
   right: 0; bottom: 100px;
   width: 420px; height: fit-content;
-  background: rgba(6,9,18,0.97);
+  background: var(--panel);
   backdrop-filter: blur(16px);
-  border-left: 1px solid rgba(255,255,255,0.07);
-  border-top: 1px solid rgba(255,255,255,0.07);
+  border-left: 1px solid var(--border);
+  border-top: 1px solid var(--border);
   z-index: 600;
   transform: translateX(100%);
-  transition: transform 0.38s cubic-bezier(.4,0,.2,1);
+  transition: transform 0.38s cubic-bezier(.4,0,.2,1), background 1.4s ease, border-color 1.4s ease;
   display: flex; flex-direction: column;
 }
 body.panel-open #panel { transform: translateX(0); }
@@ -184,22 +207,23 @@ body.panel-open #panel { transform: translateX(0); }
 }
 #panel-close::after {
   content: '✕';
-  color: rgba(255,255,255,0.35); font-size: 1rem; line-height: 1;
+  color: var(--text4); font-size: 1rem; line-height: 1;
   cursor: pointer; padding: 4px 6px;
   transition: color 0.15s;
 }
-#panel-close:hover::after { color: #fff; }
+#panel-close:hover::after { color: var(--text1); }
 
 #panel-date {
   padding: 14px 24px;
-  border-top: 1px solid rgba(255,255,255,0.07);
+  border-top: 1px solid var(--border);
   flex-shrink: 0;
   display: flex; align-items: baseline; gap: 5px;
+  transition: border-color 1.4s ease;
 }
-#date-day   { font-size: 1.1rem; font-weight: 700; color: #f0c060; }
-#date-month { font-size: 1.1rem; font-weight: 300; color: rgba(255,255,255,0.7); text-transform: lowercase; }
-#date-year  { font-size: 1.1rem; font-weight: 300; color: rgba(255,255,255,0.35); margin-right: 8px; }
-#date-time  { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.1em; color: rgba(255,255,255,0.45); }
+#date-day   { font-size: 1.1rem; font-weight: 700; color: var(--accT); transition: color 1.4s ease; }
+#date-month { font-size: 1.1rem; font-weight: 300; color: var(--text2); text-transform: lowercase; transition: color 1.4s ease; }
+#date-year  { font-size: 1.1rem; font-weight: 300; color: var(--text4); margin-right: 8px; transition: color 1.4s ease; }
+#date-time  { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.1em; color: var(--text3); transition: color 1.4s ease; }
 
 /* video */
 #video-wrap { background: #000; }
@@ -211,8 +235,8 @@ body.panel-open #panel { transform: translateX(0); }
   background: #000; flex-shrink: 0;
 }
 #rate-control { flex: 1; display: flex; align-items: center; gap: 8px; }
-.speed-label { font-size: 0.65rem; color: rgba(255,255,255,0.35); letter-spacing: 0.06em; white-space: nowrap; }
-#rate-display { font-size: 0.75rem; color: #f0c060; min-width: 24px; text-align: right; }
+.speed-label { font-size: 0.65rem; color: var(--text4); letter-spacing: 0.06em; white-space: nowrap; }
+#rate-display { font-size: 0.75rem; color: var(--accT); min-width: 24px; text-align: right; transition: color 1.4s ease; }
 #rate-slider {
   -webkit-appearance: none; appearance: none;
   flex: 1; height: 3px; border-radius: 2px;
@@ -364,14 +388,16 @@ body.immersive .leaflet-control-attribution { display: none; }
 #timeline-bar {
   display: flex; align-items: center; gap: 10px;
   padding: 0 16px; height: 100px;
-  background: rgba(4,6,14,0.96);
-  border-top: 1px solid rgba(255,255,255,0.05);
+  background: var(--chrome);
+  border-top: 1px solid var(--borderf);
   backdrop-filter: blur(10px);
+  transition: background 1.4s ease, border-color 1.4s ease;
 }
 .tl-edge-label {
   font-size: 0.65rem; letter-spacing: 0.1em;
-  color: rgba(255,255,255,0.3); white-space: nowrap;
+  color: var(--tledge); white-space: nowrap;
   text-transform: uppercase; flex-shrink: 0;
+  transition: color 1.4s ease;
 }
 #timeline-wrap { flex: 1; position: relative; display: flex; flex-direction: column; gap: 2px; }
 
@@ -417,7 +443,8 @@ body.immersive .leaflet-control-attribution { display: none; }
 #timeline-input {
   -webkit-appearance: none; appearance: none;
   width: 100%; height: 3px; border-radius: 2px;
-  background: rgba(255,255,255,0.12); outline: none; cursor: pointer; display: block;
+  background: var(--tltrack); outline: none; cursor: pointer; display: block;
+  transition: background 1.4s ease;
 }
 #timeline-input::-webkit-slider-thumb {
   -webkit-appearance: none; width: 14px; height: 14px;
@@ -451,12 +478,38 @@ body.immersive .leaflet-control-attribution { display: none; }
   text-shadow: 0 1px 4px rgba(0,0,0,1), 0 0 10px rgba(0,0,0,0.9);
 }
 
+.time-tick { background: none; border: none; }
+.time-tick-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: #f0c060; opacity: 0.7;
+  position: absolute; transform: translate(-50%, -50%);
+}
+.time-tick-label {
+  position: absolute; left: 8px; top: -7px;
+  white-space: nowrap; pointer-events: none;
+  font-size: 10px; font-weight: 500;
+  color: var(--tickc);
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.7);
+  opacity: 0;
+  transition: opacity 0.15s, color 1.4s ease;
+}
+.time-tick:hover .time-tick-label,
+.leaflet-zoom-8 .time-tick .time-tick-label,
+.leaflet-zoom-9 .time-tick .time-tick-label,
+.leaflet-zoom-10 .time-tick .time-tick-label,
+.leaflet-zoom-11 .time-tick .time-tick-label,
+.leaflet-zoom-12 .time-tick .time-tick-label,
+.leaflet-zoom-13 .time-tick .time-tick-label {
+  opacity: 1;
+}
+
 /* ── LEAFLET OVERRIDES ──────────────────────────────── */
 .leaflet-control-zoom a {
-  background: rgba(8,12,20,0.85) !important;
-  color: #aaa !important; border-color: rgba(255,255,255,0.1) !important;
+  background: var(--zoombg) !important;
+  color: var(--zoomc) !important; border-color: var(--border) !important;
+  transition: background 1.4s ease, color 1.4s ease !important;
 }
-.leaflet-control-zoom a:hover { color: #fff !important; }
+.leaflet-control-zoom a:hover { color: var(--text1) !important; }
 .leaflet-control-attribution { font-size: 9px !important; opacity: 0.4; }
 
 .nk-active-ring {

@@ -45,6 +45,11 @@ let tileLayer = L.tileLayer(TILE_DARK, {
   maxZoom: 19, subdomains: 'abcd',
 }).addTo(map);
 
+let terminator = L.terminator({
+  fillColor: '#001428', fillOpacity: 0.48,
+  color: 'rgba(80,160,220,0.6)', weight: 1,
+}).addTo(map);
+
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
 // ── DOM refs ─────────────────────────────────────────────────────────
@@ -147,6 +152,9 @@ function applyDaylight(elev) {
   state.polylines.forEach(({ line, interp }) => {
     line.setStyle({ color: routeColor, opacity: interp ? routeOp * 0.45 : routeOp });
   });
+
+  // Opacité du terminator : plus visible sur fond clair
+  terminator.setStyle({ fillOpacity: 0.48 + t * 0.22 });
 }
 
 // ── Ring marker ──────────────────────────────────────────────────────
@@ -265,6 +273,8 @@ function selectEntry(idx) {
   state.activeIdx = idx;
 
   showRing([e.lat, e.lon]);
+  // Date UTC du moment (voyage en CEST = UTC+2)
+  terminator.setTime(new Date(Date.UTC(2024, e.month - 1, e.day, e.hour - 2, e.minute)));
   applyDaylight(sunElevationDeg(e.lat, e.lon, e.day, e.month, e.hour, e.minute));
   scrollCarouselTo(nearestPhotoIdx(idx));
   if (!map.getBounds().contains([e.lat, e.lon])) {
