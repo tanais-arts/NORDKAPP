@@ -45,10 +45,38 @@ let tileLayer = L.tileLayer(TILE_DARK, {
   maxZoom: 19, subdomains: 'abcd',
 }).addTo(map);
 
-let terminator = L.terminator({
+// ── Inline terminator (day/night shadow) ───────────────────────────
+function _termJulian(date) { return date.valueOf() / 86400000 + 2440587.5; }
+function _termCompute(date) {
+  const jd = _termJulian(date), D = jd - 2451545.0;
+  const g  = (357.529 + 0.98560028 * D) * Math.PI / 180;
+  const q  = 280.459 + 0.98564736 * D;
+  const Lr = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * Math.PI / 180;
+  const e  = (23.439 - 0.0000004 * D) * Math.PI / 180;
+  const dec = Math.asin(Math.sin(e) * Math.sin(Lr));
+  const RA  = Math.atan2(Math.cos(e) * Math.sin(Lr), Math.cos(Lr));
+  const GMST = ((6.697375 + 0.0657098242 * D + (D % 1) * 24) % 24 + 24) % 24;
+  const lngSun = (-(GMST / 24 * 360) * Math.PI / 180 + RA);
+  const pts = [];
+  for (let lngDeg = -180; lngDeg <= 180; lngDeg++) {
+    const lhr = lngDeg * Math.PI / 180 + lngSun;
+    const lat = Math.atan(-Math.cos(lhr) / Math.tan(dec)) * 180 / Math.PI;
+    pts.push([lat, lngDeg]);
+  }
+  const pole = dec > 0 ? -90 : 90;
+  return [[pole, -180], ...pts, [pole, 180]];
+}
+let _termDate = null;
+const terminator = L.polygon(_termCompute(new Date()), {
   fillColor: '#001428', fillOpacity: 0.48,
-  color: 'rgba(80,160,220,0.6)', weight: 1,
+  stroke: true, color: 'rgba(80,160,220,0.6)', weight: 1,
+  interactive: false,
 }).addTo(map);
+terminator.setTime = function(date) {
+  if (_termDate && Math.abs(date - _termDate) < 30000) return;
+  _termDate = date;
+  this.setLatLngs(_termCompute(date));
+};
 
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
