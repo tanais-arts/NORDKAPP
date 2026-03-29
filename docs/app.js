@@ -80,9 +80,16 @@ function lbShowCurrent() {
   if (!item) return;
   const prog = document.getElementById('lb-progress');
   prog.classList.add('active');
-  lbImg.onload  = () => prog.classList.remove('active');
-  lbImg.onerror = () => prog.classList.remove('active');
-  lbImg.src = item.webp || item.src;
+  const srcs = [item.webp, item.src, item.thumb].filter(Boolean);
+  let si = 0;
+  const tryNext = () => {
+    if (si >= srcs.length) { prog.classList.remove('active'); return; }
+    const src = srcs[si++];
+    lbImg.onload  = () => prog.classList.remove('active');
+    lbImg.onerror = tryNext;
+    lbImg.src = src;
+  };
+  tryNext();
   document.getElementById('lightbox-prev').style.visibility = state.lbIdx > 0 ? '' : 'hidden';
   document.getElementById('lightbox-next').style.visibility = state.lbIdx < state.lbPhotos.length - 1 ? '' : 'hidden';
 }
@@ -139,7 +146,11 @@ function scrollCarouselTo(pi) {
   const prev = state.thumbEls[state.activePhotoIdx];
   if (prev) { prev.classList.remove('active'); prev.fetchPriority = 'low'; }
   const next = state.thumbEls[pi];
-  if (next) { next.classList.add('active'); next.fetchPriority = 'high'; next.loading = 'eager'; }
+  if (next) {
+    next.classList.add('active');
+    next.fetchPriority = 'high';
+    if (next.dataset.src) { next.src = next.dataset.src; delete next.dataset.src; }
+  }
   state.activePhotoIdx = pi;
 }
 
@@ -221,21 +232,31 @@ async function init() {
 
   // Carousel
   const carousel = document.getElementById('photo-carousel');
+  const thumbObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        if (img.dataset.src) { img.src = img.dataset.src; delete img.dataset.src; }
+        thumbObserver.unobserve(img);
+      }
+    });
+  }, { root: carousel, rootMargin: '0px 600px 0px 600px' });
+
   const fragment = document.createDocumentFragment();
   photos.forEach((p, i) => {
     const img = document.createElement('img');
-    img.src = p.thumb || p.src;
+    img.dataset.src = p.thumb || p.src;
     img.className = 'photo-thumb';
-    img.loading = 'lazy';
     img.draggable = false;
     img.addEventListener('click', () => openLightbox(photos, i));
     fragment.appendChild(img);
   });
   carousel.appendChild(fragment);
   state.thumbEls = Array.from(carousel.querySelectorAll('.photo-thumb'));
+  state.thumbEls.forEach(img => thumbObserver.observe(img));
 
-  // Nearest entryIdx for each city
-  cities.forEach(c => {
+  // Nearest entryIdx for each city (cities.json + visited.json)
+  const assignEntryIdx = arr => arr.forEach(c => {
     let best = 0, bestD = Infinity;
     entries.forEach((e, i) => {
       const d = (e.lat - c.lat) ** 2 + (e.lon - c.lon) ** 2;
@@ -243,6 +264,8 @@ async function init() {
     });
     c.entryIdx = best;
   });
+  assignEntryIdx(cities);
+  assignEntryIdx(visited);
 
   // Route polyline
   const latlngs = entries.map(e => [e.lat, e.lon]);
@@ -374,13 +397,23 @@ async function init() {
     if (mobilePhotoStrip) return;
     mobilePhotoStrip = document.createElement('div');
     mobilePhotoStrip.className = 'mob-photo-strip';
+    const stripObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          if (img.dataset.src) { img.src = img.dataset.src; delete img.dataset.src; }
+          stripObserver.unobserve(img);
+        }
+      });
+    }, { root: mobilePhotoStrip, rootMargin: '0px 400px 0px 400px' });
+
     photos.forEach((p, i) => {
       const img = document.createElement('img');
-      img.src = p.thumb || p.src;
-      img.loading = 'lazy';
+      img.dataset.src = p.thumb || p.src;
       img.draggable = false;
       img.addEventListener('click', () => openLightbox(photos, i));
       mobilePhotoStrip.appendChild(img);
+      stripObserver.observe(img);
     });
   }
 

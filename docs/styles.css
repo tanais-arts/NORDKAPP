@@ -278,6 +278,10 @@ body.immersive .leaflet-control-attribution { display: none; }
 #btn-exit-immersive:hover { color: #fff; }
 
 /* ── LIGHTBOX ───────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
 #lightbox {
   position: fixed; inset: 0; z-index: 900;
   display: flex; align-items: center; justify-content: center;
