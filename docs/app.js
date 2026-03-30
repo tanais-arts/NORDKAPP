@@ -1028,14 +1028,11 @@ async function init() {
   let curSeg = [], curInterp = null;
   const flushSeg = (interp) => {
     if (curSeg.length < 2) return;
+    if (interp) return; // ne pas afficher les segments interpolés
     let line;
-    if (interp) {
-      line = L.polyline(curSeg, { color: ACCENT, weight: 1.5, opacity: 0.30, smoothFactor: 2 }).addTo(map);
-    } else {
-      line = L.polyline(curSeg, { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1 })
-        .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
-        .addTo(map);
-    }
+    line = L.polyline(curSeg, { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1 })
+      .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
+      .addTo(map);
     state.polylines.push({ line, interp });
   };
   entries.forEach((e, i) => {
