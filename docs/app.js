@@ -1343,6 +1343,7 @@ async function init() {
     setTimeout(() => map.invalidateSize(), 50);
   }
 
+  document.getElementById('video-wrap').addEventListener('click', enterImmersive);
   document.getElementById('btn-immersive').addEventListener('click', enterImmersive);
   document.getElementById('btn-exit-immersive').addEventListener('click', exitImmersive);
 

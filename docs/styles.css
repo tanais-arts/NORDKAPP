@@ -282,8 +282,18 @@ body.panel-open #panel { transform: translateX(0); }
 #date-time  { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.1em; color: var(--text3); transition: color 1.4s ease; }
 
 /* video */
-#video-wrap { background: #000; }
-#player { width: 100%; display: block; background: #000; aspect-ratio: 16/9; }
+#video-wrap { background: #000; position: relative; cursor: pointer; }
+#video-wrap::after {
+  content: '⤢  MODE IMMERSIF';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em;
+  color: #f0c060; background: rgba(0,0,0,0.45);
+  opacity: 0; transition: opacity 0.2s;
+  pointer-events: none;
+}
+#video-wrap:hover::after { opacity: 1; }
+#player { width: 100%; display: block; background: #000; aspect-ratio: 16/9; pointer-events: none; }
 
 #video-toolbar {
   display: flex; align-items: center; gap: 8px;
