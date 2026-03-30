@@ -1294,7 +1294,7 @@ async function init() {
   // Panel controls
   document.getElementById('panel-close').addEventListener('click', () => { closePanel(); player.pause(); });
 
-  // Carousel arrows
+  // Carousel arrows — défilement continu 1 photo/300ms au maintien du bouton
   const carouselEl = document.getElementById('photo-carousel');
   function selectEntryFromCarouselCenter() {
     const scrollLeft = carouselEl.scrollLeft;
@@ -1303,14 +1303,30 @@ async function init() {
     const p = state.photos[photoIdx];
     if (p && p.entryIdx != null) selectEntry(p.entryIdx);
   }
-  document.getElementById('carousel-prev').addEventListener('click', () => {
-    carouselEl.scrollBy({ left: -4 * THUMB_STEP, behavior: 'smooth' });
-    setTimeout(selectEntryFromCarouselCenter, 400);
-  });
-  document.getElementById('carousel-next').addEventListener('click', () => {
-    carouselEl.scrollBy({ left:  4 * THUMB_STEP, behavior: 'smooth' });
-    setTimeout(selectEntryFromCarouselCenter, 400);
-  });
+
+  function attachCarouselArrow(btnId, dir) {
+    const btn = document.getElementById(btnId);
+    let intervalId = null;
+    function step() {
+      carouselEl.scrollBy({ left: dir * THUMB_STEP, behavior: 'smooth' });
+      selectEntryFromCarouselCenter();
+    }
+    function start() {
+      step();
+      intervalId = setInterval(step, 300);
+    }
+    function stop() {
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+    }
+    btn.addEventListener('mousedown', start);
+    btn.addEventListener('touchstart', start, { passive: true });
+    btn.addEventListener('mouseup', stop);
+    btn.addEventListener('mouseleave', stop);
+    btn.addEventListener('touchend', stop);
+  }
+
+  attachCarouselArrow('carousel-prev', -1);
+  attachCarouselArrow('carousel-next',  1);
 
   // Mode immersif
   const stage     = document.getElementById('video-stage');
