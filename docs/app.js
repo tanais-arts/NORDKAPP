@@ -705,10 +705,9 @@ function updatePanel(e, idx) {
 
 // ── Init ──────────────────────────────────────────────────────────────
 async function init() {
-  let entries, photos, cities, visited, escales;
+  let entries, photos, cities, visited, escales, gapRoutes;
   try {
-    let gapRoutes = [];
-  [entries, photos, cities, visited, escales, gapRoutes] = await Promise.all([
+    [entries, photos, cities, visited, escales, gapRoutes] = await Promise.all([
       fetch('travel.json?v=1774802661').then(r => r.json()),
       fetch('photos.json?v=1774804575').then(r => r.json()),
       fetch('cities.json?v=1774802661').then(r => r.json()),
