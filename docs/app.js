@@ -707,12 +707,14 @@ function updatePanel(e, idx) {
 async function init() {
   let entries, photos, cities, visited, escales;
   try {
-    [entries, photos, cities, visited, escales] = await Promise.all([
+    let gapRoutes = [];
+  [entries, photos, cities, visited, escales, gapRoutes] = await Promise.all([
       fetch('travel.json?v=1774802661').then(r => r.json()),
       fetch('photos.json?v=1774804575').then(r => r.json()),
       fetch('cities.json?v=1774802661').then(r => r.json()),
       fetch('visited.json').then(r => r.json()),
       fetch('escales.json').then(r => r.json()),
+      fetch('gap_routes.json').then(r => r.json()).catch(() => []),
     ]);
     window.escales = escales; // <--- Ajouté pour rendre escales global et accessible partout
   } catch (err) {
@@ -1038,15 +1040,18 @@ async function init() {
   };
   entries.forEach((e, i) => {
     const interp = e.frame === 0;
-    // Couper la trace sur les trous GPS (saut > seuil) — relier par un trait fin tireté
+    // Couper la trace sur les trous GPS (saut > seuil) — relier par l'itinéraire routier
     if (i > 0 && gapKm(entries[i - 1], e) > GAP_THRESHOLD_KM) {
-      const lastPt = curSeg.length > 0 ? curSeg[curSeg.length - 1] : null;
       flushSeg(curInterp);
-      if (lastPt) {
-        L.polyline([lastPt, [e.lat, e.lon]], { color: ACCENT, weight: 2, opacity: 1, dashArray: '6 6', smoothFactor: 1 })
-          .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
-          .addTo(map);
-      }
+      // Chercher l'itinéraire pré-calculé correspondant à ce gap
+      const prev = entries[i - 1];
+      const gap = gapRoutes.find(g =>
+        Math.abs(g.fromLatLon[0] - prev.lat) < 0.001 && Math.abs(g.fromLatLon[1] - prev.lon) < 0.001
+      );
+      const gapCoords = gap ? gap.coords : [[prev.lat, prev.lon], [e.lat, e.lon]];
+      L.polyline(gapCoords, { color: ACCENT, weight: 2, opacity: 1, dashArray: '6 6', smoothFactor: 1 })
+        .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
+        .addTo(map);
       curSeg = [];
       curInterp = interp;
     } else if (curInterp === null) {
