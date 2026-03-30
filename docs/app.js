@@ -387,7 +387,7 @@ function lbShowCurrent() {
   tryNext();
   document.getElementById('lightbox-prev').style.visibility = state.lbIdx > 0 ? '' : 'hidden';
   document.getElementById('lightbox-next').style.visibility = state.lbIdx < state.lbPhotos.length - 1 ? '' : 'hidden';
-  document.getElementById('lb-counter').textContent = `${state.lbIdx + 1} / ${state.lbPhotos.length}`;
+  // lb-counter masqué
   // Bouton téléchargement → Sources/ (même sous-arborescence que Photos/)
   const dlBtn = document.getElementById('lb-download');
   const srcUrl = (item.src || item.thumb).replace('/Photos/', '/Sources/');
