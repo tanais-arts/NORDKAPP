@@ -229,7 +229,7 @@ html, body {
 #title-main {
   font-size: 1.25rem; font-weight: 900;
   letter-spacing: 0.25em; color: var(--text1);
-  text-shadow: 0 2px 16px rgba(0,0,0,0.9);
+  text-shadow: none;
   line-height: 1;
 }
 #title-sub {
