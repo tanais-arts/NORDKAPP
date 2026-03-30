@@ -1029,7 +1029,7 @@ async function init() {
   const flushSeg = (interp) => {
     if (curSeg.length < 2) return;
     const opts = interp
-      ? { color: ACCENT, weight: 2, opacity: 0.35, smoothFactor: 1, dashArray: '6 6' }
+      ? { color: ACCENT, weight: 2, opacity: 1, smoothFactor: 1, dashArray: '6 6' }
       : { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1 };
     const line = L.polyline(curSeg, opts)
       .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
