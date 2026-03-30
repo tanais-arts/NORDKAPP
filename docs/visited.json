@@ -1,122 +1,23 @@
 [
-  {
-    "name": "Sarlat",
-    "lat": 44.842075,
-    "lon": 1.238043,
-    "entryIdx": 0
-  },
-  {
-    "name": "Besançon",
-    "lat": 47.27681,
-    "lon": 5.995785,
-    "entryIdx": 340
-  },
-  {
-    "name": "Frankfurt",
-    "lat": 50.100689,
-    "lon": 8.610553,
-    "entryIdx": 740
-  },
-  {
-    "name": "Copenhague",
-    "lat": 55.673973,
-    "lon": 12.562673,
-    "entryIdx": 1261
-  },
-  {
-    "name": "Göteborg",
-    "lat": 57.712925,
-    "lon": 11.968754,
-    "entryIdx": 1490
-  },
-  {
-    "name": "Oslo",
-    "lat": 59.911823,
-    "lon": 10.754515,
-    "entryIdx": 1694
-  },
-  {
-    "name": "Trondheim",
-    "lat": 63.428516,
-    "lon": 10.392823,
-    "entryIdx": 2121
-  },
-  {
-    "name": "Mosjøen",
-    "lat": 65.837425,
-    "lon": 13.1895,
-    "entryIdx": 2433
-  },
-  {
-    "name": "Lødingen",
-    "lat": 68.420029,
-    "lon": 15.988855,
-    "entryIdx": 3287
-  },
-  {
-    "name": "Å",
-    "lat": 67.88269,
-    "lon": 12.982148,
-    "entryIdx": 3100
-  },
-  {
-    "name": "Tromsø",
-    "lat": 69.649879,
-    "lon": 18.952688,
-    "entryIdx": 3606
-  },
-  {
-    "name": "Alta",
-    "lat": 69.975632,
-    "lon": 23.336056,
-    "entryIdx": 3888
-  },
-  {
-    "name": "Honningsvåg",
-    "lat": 70.995041,
-    "lon": 25.956148,
-    "entryIdx": 4036
-  },
-  {
-    "name": "Enontekiö",
-    "lat": 68.38427,
-    "lon": 23.635031,
-    "entryIdx": 4558
-  },
-  {
-    "name": "Luleå",
-    "lat": 65.582809,
-    "lon": 22.157969,
-    "entryIdx": 4909
-  },
-  {
-    "name": "Sundsvall",
-    "lat": 62.389614,
-    "lon": 17.309912,
-    "entryIdx": 5267
-  },
-  {
-    "name": "Stockholm",
-    "lat": 59.321228,
-    "lon": 18.055029,
-    "entryIdx": 5570
-  },
-  {
-    "name": "Kalmar",
-    "lat": 56.660946,
-    "lon": 16.358862,
-    "entryIdx": 5886
-  },
-  {
-    "name": "Brême",
-    "lat": 53.083134,
-    "lon": 8.792599,
-    "entryIdx": 6718
-  },
-  {
-    "name": "Paris",
-    "lat": 48.820782,
-    "lon": 2.401966,
-    "entryIdx": 7381
-  }
+  { "name": "Sarlat", "lat": 44.842075, "lon": 1.238043, "entryIdx": 0 },
+  { "name": "Besançon", "lat": 47.27681, "lon": 5.995785, "entryIdx": 340 },
+  { "name": "Frankfurt", "lat": 50.100689, "lon": 8.610553, "entryIdx": 740 },
+  { "name": "Copenhague", "lat": 55.673973, "lon": 12.562673, "entryIdx": 1261 },
+  { "name": "Göteborg", "lat": 57.712925, "lon": 11.968754, "entryIdx": 1490 },
+  { "name": "Oslo", "lat": 59.911823, "lon": 10.754515, "entryIdx": 1694 },
+  { "name": "Trondheim", "lat": 63.428516, "lon": 10.392823, "entryIdx": 2121 },
+  { "name": "Mosjøen", "lat": 65.837425, "lon": 13.1895, "entryIdx": 2433 },
+  { "name": "Å", "lat": 67.88269, "lon": 12.982148, "entryIdx": 3100 },
+  { "name": "Lødingen", "lat": 68.420029, "lon": 15.988855, "entryIdx": 3287 },
+  { "name": "Tromsø", "lat": 69.649879, "lon": 18.952688, "entryIdx": 3606 },
+  { "name": "Alta", "lat": 69.975632, "lon": 23.336056, "entryIdx": 3888 },
+  { "name": "Honningsvåg", "lat": 70.995041, "lon": 25.956148, "entryIdx": 4036 },
+  { "name": "Enontekiö", "lat": 68.38427, "lon": 23.635031, "entryIdx": 4558 },
+  { "name": "Luleå", "lat": 65.582809, "lon": 22.157969, "entryIdx": 4909 },
+  { "name": "Sundsvall", "lat": 62.389614, "lon": 17.309912, "entryIdx": 5267 },
+  { "name": "Stockholm", "lat": 59.321228, "lon": 18.055029, "entryIdx": 5570 },
+  { "name": "Kalmar", "lat": 56.660946, "lon": 16.358862, "entryIdx": 5886 },
+  { "name": "Malmö", "lat": 55.57637, "lon": 12.821198, "entryIdx": 6302 },
+  { "name": "Brême", "lat": 53.083134, "lon": 8.792599, "entryIdx": 6718 },
+  { "name": "Paris", "lat": 48.820782, "lon": 2.401966, "entryIdx": 7381 }
 ]

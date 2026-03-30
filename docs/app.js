@@ -10,7 +10,7 @@ const DOT_ACTIVE = 8;
 
 // ── Tiles ───────────────────────────────────────────────────────────
 const TILE_DARK  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
 function pad(n)        { return String(n).padStart(4, '0'); }
 function frameSrc(n)   { return `${FRAME_BASE}${pad(n)}.jpg`; }
@@ -36,11 +36,15 @@ const state = {
   lastT:        -1,
 };
 
+// If set, use this fixed terminator opacity for all timeline previews
+let fixedTermOp = null;
+
 // ── Map ──────────────────────────────────────────────────────────────
 const map = L.map('map', { zoomControl: false, attributionControl: true })
   .setView([55, 10], 5);
 
-let tileLayer = L.tileLayer(TILE_DARK, {
+// Use the light tile set by default for a brighter daytime map
+let tileLayer = L.tileLayer(TILE_LIGHT, {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
   maxZoom: 19, subdomains: 'abcd',
 }).addTo(map);
@@ -48,6 +52,51 @@ let tileLayer = L.tileLayer(TILE_DARK, {
 // ── Inline terminator (day/night shadow) ───────────────────────────
 function _termJulian(date) { return date.valueOf() / 86400000 + 2440587.5; }
 function _termCompute(date) {
+  const pts = [];
+  // If SunCalc is available, use it to robustly find the terminator by locating
+  // latitudes where the sun altitude crosses the horizon for each longitude.
+  if (window.SunCalc) {
+    // coarse longitude step for performance
+    for (let lngDeg = -180; lngDeg <= 180; lngDeg += 2) {
+      // First sweep with coarse lat steps to find a sign change
+      let bracketFound = false;
+      let prevLat = -80;
+      let prevAlt = SunCalc.getPosition(date, prevLat, lngDeg).altitude;
+      for (let lat = -72; lat <= 80; lat += 8) {
+        const alt = SunCalc.getPosition(date, lat, lngDeg).altitude;
+        if (prevAlt === 0) { pts.push([prevLat, lngDeg]); bracketFound = true; break; }
+        if (prevAlt * alt <= 0) {
+          // refine with smaller step inside bracket
+          let found = false;
+          for (let rlat = prevLat; rlat <= lat; rlat += 1) {
+            const ralt = SunCalc.getPosition(date, rlat, lngDeg).altitude;
+            if (ralt === 0) { pts.push([rlat, lngDeg]); found = true; break; }
+            if (ralt * prevAlt <= 0) {
+              // linear interp between prevLat and rlat
+              const t = Math.abs(prevAlt) / (Math.abs(prevAlt) + Math.abs(ralt));
+              const root = prevLat + t * (rlat - prevLat);
+              pts.push([root, lngDeg]);
+              found = true; break;
+            }
+            prevAlt = ralt; prevLat = rlat;
+          }
+          if (!found) pts.push([prevLat, lngDeg]);
+          bracketFound = true; break;
+        }
+        prevAlt = alt; prevLat = lat;
+      }
+      if (!bracketFound) {
+        // fallback: choose extreme depending on last sampled altitude
+        pts.push([prevAlt > 0 ? 80 : -80, lngDeg]);
+      }
+    }
+    // decide pole inclusion by checking north-pole sun altitude
+    const northAlt = SunCalc.getPosition(date, 90, 0).altitude;
+    const pole = northAlt > 0 ? -90 : 90;
+    return [[pole, -180], ...pts, [pole, 180]];
+  }
+
+  // Fallback to original analytic computation if SunCalc is unavailable
   const jd = _termJulian(date), D = jd - 2451545.0;
   const g  = (357.529 + 0.98560028 * D) * Math.PI / 180;
   const q  = 280.459 + 0.98564736 * D;
@@ -57,9 +106,10 @@ function _termCompute(date) {
   const RA  = Math.atan2(Math.cos(e) * Math.sin(Lr), Math.cos(Lr));
   const GMST = ((6.697375 + 0.0657098242 * D + (D % 1) * 24) % 24 + 24) % 24;
   const lngSun = (-(GMST / 24 * 360) * Math.PI / 180 + RA);
-  const pts = [];
-  for (let lngDeg = -180; lngDeg <= 180; lngDeg++) {
-    const lhr = lngDeg * Math.PI / 180 + lngSun;
+  // reduce resolution to improve performance (step 2°)
+  for (let lngDeg = -180; lngDeg <= 180; lngDeg += 2) {
+    // use subtraction here so the terminator moves west→east correctly
+    const lhr = lngDeg * Math.PI / 180 - lngSun;
     const lat = Math.atan(-Math.cos(lhr) / Math.tan(dec)) * 180 / Math.PI;
     pts.push([lat, lngDeg]);
   }
@@ -67,18 +117,125 @@ function _termCompute(date) {
   return [[pole, -180], ...pts, [pole, 180]];
 }
 let _termDate = null;
-const terminator = L.polygon(_termCompute(new Date()), {
-  fillColor: '#001428', fillOpacity: 0.48,
-  stroke: true, color: 'rgba(80,160,220,0.6)', weight: 1,
+let terminator = null; // created after panes are set up
+
+// Throttle updates to the terminator to avoid blocking the main thread
+let _termPendingDate = null;
+let _termRafId = null;
+function scheduleTerminatorUpdate(date) {
+  _termPendingDate = date;
+  if (_termRafId) return;
+  _termRafId = requestAnimationFrame(() => {
+    if (_termPendingDate) {
+      terminator.setTime(_termPendingDate);
+    }
+    _termPendingDate = null;
+    _termRafId = null;
+  });
+}
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+// Create dedicated panes: labels above everything, shade above tiles
+map.createPane('shadePane');
+map.getPane('shadePane').style.zIndex = 250;
+map.getPane('shadePane').style.pointerEvents = 'none';
+map.getPane('shadePane').style.mixBlendMode = 'multiply';
+map.createPane('labelsPane');
+map.getPane('labelsPane').style.zIndex = 700;
+map.getPane('labelsPane').style.pointerEvents = 'none';
+// Terminator pane above tiles and hillshade, below labels
+map.createPane('terminatorPane');
+map.getPane('terminatorPane').style.zIndex = 680;
+map.getPane('terminatorPane').style.pointerEvents = 'none';
+map.getPane('terminatorPane').style.mixBlendMode = 'multiply';
+
+// Inject an invisible SVG <defs> with a Gaussian blur filter for the terminator
+function ensureTerminatorFilter() {
+  if (document.getElementById('nk-blur-defs')) return;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+  svg.setAttribute('aria-hidden', 'true'); svg.style.position = 'absolute';
+  svg.style.left = '0'; svg.style.top = '0'; svg.id = 'nk-blur-defs';
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+  filter.setAttribute('id', 'nk-blur'); filter.setAttribute('x', '-50%'); filter.setAttribute('y', '-50%');
+  filter.setAttribute('width', '200%'); filter.setAttribute('height', '200%');
+  const fe = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+  fe.setAttribute('stdDeviation', '14'); fe.setAttribute('result', 'b');
+  filter.appendChild(fe);
+  defs.appendChild(filter);
+  svg.appendChild(defs);
+  document.body.appendChild(svg);
+}
+
+
+// Now that panes exist, create a neutral terminator polygon on its pane
+// Do NOT compute with the current date at module load; it will be initialized
+// properly once travel data is loaded (see `init`).
+terminator = L.polygon([[0,0],[0,0.01],[0.01,0.01],[0.01,0]], {
+  pane: 'terminatorPane',
+  // visible baseline night opacity; detailed adjustments happen when selecting entries
+  // use slightly lighter blue and a lower default opacity so the map remains visible
+  fillColor: '#001026', fillOpacity: 0.7,
+  stroke: true, color: 'rgba(40,110,200,0.6)', weight: 1,
   interactive: false,
 }).addTo(map);
+try { ensureTerminatorFilter(); const el = terminator.getElement && terminator.getElement(); if (el) el.classList.add('nk-terminator'); } catch (e) { /* ignore */ }
+terminator.bringToFront();
 terminator.setTime = function(date) {
   if (_termDate && Math.abs(date - _termDate) < 30000) return;
   _termDate = date;
   this.setLatLngs(_termCompute(date));
 };
 
-L.control.zoom({ position: 'bottomright' }).addTo(map);
+// Hillshade overlay to give altitude impression (subtle)
+// Probe a sample tile first to avoid flooding the console with DNS errors.
+const hillshadeUrl = 'https://tiles.wmflabs.org/hillshading/{z}/{x}/{y}.png';
+const hillshade = L.tileLayer(hillshadeUrl, {
+  pane: 'shadePane', opacity: 0.25,
+  attribution: 'Hillshade \u00A9 OpenStreetMap contributors',
+  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+});
+
+function addFallbackHillshade() {
+  console.warn('Using fallback hillshade (Stamen terrain)');
+  const fallback = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.jpg', {
+    pane: 'shadePane', opacity: 0.14,
+    attribution: 'Hillshade fallback \u00A9 Stamen Design'
+  }).addTo(map);
+  return fallback;
+}
+
+let _hillshadeFailCount = 0;
+function onHillshadeTileError() {
+  _hillshadeFailCount++;
+  if (_hillshadeFailCount > 6) {
+    try { map.removeLayer(hillshade); } catch (e) { /* ignore */ }
+    hillshade.off('tileerror', onHillshadeTileError);
+    addFallbackHillshade();
+  }
+}
+
+// Probe a known tile (low zoom) and add the appropriate layer based on result.
+const probeUrl = 'https://tiles.wmflabs.org/hillshading/4/9/3.png';
+let _probeTimedOut = false;
+const probeTimeout = setTimeout(() => { _probeTimedOut = true; console.warn('Hillshade probe timed out — using fallback'); addFallbackHillshade(); }, 2500);
+const probeImg = new Image();
+probeImg.crossOrigin = 'anonymous';
+probeImg.onload = () => {
+  if (_probeTimedOut) return;
+  clearTimeout(probeTimeout);
+  hillshade.addTo(map);
+  hillshade.on('tileerror', onHillshadeTileError);
+};
+probeImg.onerror = () => {
+  if (_probeTimedOut) return;
+  clearTimeout(probeTimeout);
+  console.warn('Hillshade probe failed — switching to fallback');
+  addFallbackHillshade();
+};
+probeImg.src = probeUrl;
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const player       = document.getElementById('player');
@@ -110,6 +267,37 @@ function sunElevationDeg(lat, lon, day, month, hour, minute) {
   return Math.asin(Math.sin(φ)*Math.sin(decl) + Math.cos(φ)*Math.cos(decl)*Math.cos(H)) * 180/Math.PI;
 }
 
+// Apply only to the terminator overlay: compute opacity from sun elevation
+function applyDaylight(elev) {
+  // elev in degrees. Use a tolerant smooth ramp: do not darken until a small
+  // negative elevation (sun just below horizon). This avoids marking places
+  // like Trondheim as fully night during civil/nautical twilight or midnight sun.
+  // Parameters: no-darkening threshold and full-night threshold (degrees)
+  const NO_DARK_thresh = -3;   // elevation >= -3° -> treated as day
+  const FULL_NIGHT_thresh = -12; // elevation <= -12° -> full night
+
+  // computeTermOpacity encapsulates the previous ramp -> opacity mapping
+  const computeTermOpacity = (e) => {
+    let tt;
+    if (e >= NO_DARK_thresh) tt = 0;
+    else if (e <= FULL_NIGHT_thresh) tt = 1;
+    else {
+      tt = (NO_DARK_thresh - e) / (NO_DARK_thresh - FULL_NIGHT_thresh);
+    }
+    tt = tt * tt * (3 - 2 * tt);
+    const baseOp = 0.20;
+    const extra = 0.60;
+    return Math.max(0, Math.min(0.8, baseOp + tt * extra));
+  };
+
+  const termOp = (fixedTermOp !== null) ? fixedTermOp : computeTermOpacity(elev);
+
+  if (terminator) {
+    terminator.setStyle({ fillOpacity: termOp, fillColor: '#000412' });
+    try { terminator.bringToFront(); } catch (e) { /* ignore */ }
+  }
+}
+
 // Palettes [r, g, b, a]
 const P_NIGHT = {
   bg:       [8,12,20,1],      chrome:   [4,6,14,0.92],    panel:    [6,9,18,0.97],
@@ -123,72 +311,47 @@ const P_NIGHT = {
   route:    [240,192,96,1],   routeOp: 0.65,
 };
 const P_DAY = {
-  bg:       [255,251,240,1],  chrome:   [255,250,242,0.93], panel:  [255,250,242,0.98],
-  border:   [0,0,0,0.08],     borderF:  [0,0,0,0.05],
-  text1:    [24,22,38,1],     text2:    [24,22,38,0.75],
-  text3:    [24,22,38,0.50],  text4:    [24,22,38,0.38],
-  text5:    [24,22,38,0.30],  accentT:  [168,96,0,1],
-  tlTrack:  [24,22,38,0.12],  tlEdge:   [24,22,38,0.30],
-  cityC:    [24,22,38,0.88],  tickC:    [24,22,38,0.55],
-  zoomBg:   [255,250,242,0.92], zoomC:  [80,70,60,1],
-  route:    [200,120,10,1],   routeOp: 0.80,
+  // Blue-forward daytime palette (pronounced blue tint)
+  bg:       [230,245,255,1],  chrome:   [220,240,250,0.93], panel:  [255,255,255,0.98],
+  border:   [6,30,40,0.08],   borderF:  [6,30,40,0.05],
+  text1:    [8,18,28,1],      text2:    [8,18,28,0.75],
+  text3:    [8,18,28,0.50],   text4:    [8,18,28,0.38],
+  text5:    [8,18,28,0.30],   accentT:  [40,130,200,1],
+  tlTrack:  [8,18,28,0.12],   tlEdge:   [8,18,28,0.30],
+  cityC:    [8,18,28,0.88],   tickC:    [8,18,28,0.55],
+  zoomBg:   [255,255,255,0.92], zoomC:  [30,90,140,1],
+  route:    [10,110,200,1],   routeOp: 0.88,
 };
 
-function lerpC(n, d, t) {
-  const r = Math.round(n[0] + (d[0]-n[0])*t);
-  const g = Math.round(n[1] + (d[1]-n[1])*t);
-  const b = Math.round(n[2] + (d[2]-n[2])*t);
-  const a = (n[3] + (d[3]-n[3])*t).toFixed(3);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-function applyDaylight(elev) {
-  // t=0 nuit profonde, t=1 soleil haut — plafonné à 0.42 : jamais de mode clair
-  // (voyage en soleil de minuit → élévation toujours élevée, on garde le côté sombre)
-  const t = Math.max(0, Math.min(0.42, (elev + 4) / 10));
-  if (Math.abs(t - state.lastT) < 0.008) return;
-  state.lastT = t;
+// Apply fixed daytime palette to CSS root (no automatic UI shift with sun)
+(function applyFixedDayPalette(){
   const root = document.documentElement;
+  const toRgba = (a) => `rgba(${a[0]},${a[1]},${a[2]},${a[3]})`;
 
-  // Barres haut/bas : toujours noires (--bg, --chrome épinglés sur P_NIGHT)
-  root.style.setProperty('--bg',       lerpC(P_NIGHT.bg,      P_NIGHT.bg,     0));
-  root.style.setProperty('--chrome',   lerpC(P_NIGHT.chrome,  P_NIGHT.chrome, 0));
+  root.style.setProperty('--bg',      toRgba(P_DAY.bg));
+  root.style.setProperty('--chrome',  toRgba(P_DAY.chrome));
+  root.style.setProperty('--panel',   toRgba(P_DAY.panel));
+  root.style.setProperty('--border',  toRgba(P_DAY.border));
+  root.style.setProperty('--borderf', toRgba(P_DAY.borderF || P_DAY.border));
+  root.style.setProperty('--text1',   toRgba(P_DAY.text1));
+  root.style.setProperty('--text2',   toRgba(P_DAY.text2));
+  root.style.setProperty('--text3',   toRgba(P_DAY.text3));
+  root.style.setProperty('--text4',   toRgba(P_DAY.text4));
+  root.style.setProperty('--text5',   toRgba(P_DAY.text5));
+  root.style.setProperty('--accT',    toRgba(P_DAY.accentT || P_DAY.accentT));
+  root.style.setProperty('--tltrack', toRgba(P_DAY.tlTrack));
+  root.style.setProperty('--tledge',  toRgba(P_DAY.tlEdge));
+  root.style.setProperty('--cityc',   toRgba(P_DAY.cityC));
+  root.style.setProperty('--tickc',   toRgba(P_DAY.tickC));
+  root.style.setProperty('--zoombg',  toRgba(P_DAY.zoomBg));
+  root.style.setProperty('--zoomc',   toRgba(P_DAY.zoomC));
 
-  // Le reste se réchauffe légèrement selon l'élévation solaire
-  root.style.setProperty('--panel',    lerpC(P_NIGHT.panel,   P_DAY.panel,    t));
-  root.style.setProperty('--border',   lerpC(P_NIGHT.border,  P_DAY.border,   t));
-  root.style.setProperty('--borderf',  lerpC(P_NIGHT.borderF, P_DAY.borderF,  t));
-  root.style.setProperty('--text1',    lerpC(P_NIGHT.text1,   P_DAY.text1,    t));
-  root.style.setProperty('--text2',    lerpC(P_NIGHT.text2,   P_DAY.text2,    t));
-  root.style.setProperty('--text3',    lerpC(P_NIGHT.text3,   P_DAY.text3,    t));
-  root.style.setProperty('--text4',    lerpC(P_NIGHT.text4,   P_DAY.text4,    t));
-  root.style.setProperty('--text5',    lerpC(P_NIGHT.text5,   P_DAY.text5,    t));
-  root.style.setProperty('--accT',     lerpC(P_NIGHT.accentT, P_DAY.accentT,  t));
-  root.style.setProperty('--tltrack',  lerpC(P_NIGHT.tlTrack, P_DAY.tlTrack,  t));
-  root.style.setProperty('--tledge',   lerpC(P_NIGHT.tlEdge,  P_DAY.tlEdge,   t));
-  root.style.setProperty('--cityc',    lerpC(P_NIGHT.cityC,   P_DAY.cityC,    t));
-  root.style.setProperty('--tickc',    lerpC(P_NIGHT.tickC,   P_DAY.tickC,    t));
-  root.style.setProperty('--zoombg',   lerpC(P_NIGHT.zoomBg,  P_DAY.zoomBg,   t));
-  root.style.setProperty('--zoomc',    lerpC(P_NIGHT.zoomC,   P_DAY.zoomC,    t));
+  // Force light tiles for daytime appearance
+  tileLayer.setUrl(TILE_LIGHT);
 
-  // Tuile toujours sombre (t max 0.42 < seuil 0.45 → jamais de basculement)
-  // mais on garde le mécanisme au cas où
-  const useLight = t > 0.45;
-  if (useLight !== state.lightTile) {
-    state.lightTile = useLight;
-    tileLayer.setUrl(useLight ? TILE_LIGHT : TILE_DARK);
-  }
-
-  // Couleur des polylines
-  const routeColor = lerpC(P_NIGHT.route, P_DAY.route, t);
-  const routeOp    = P_NIGHT.routeOp + (P_DAY.routeOp - P_NIGHT.routeOp) * t;
-  state.polylines.forEach(({ line, interp }) => {
-    line.setStyle({ color: routeColor, opacity: interp ? routeOp * 0.45 : routeOp });
-  });
-
-  // Terminator : opacité réduite quand l'ambiance est plus lumineuse
-  terminator.setStyle({ fillOpacity: 0.48 + t * 0.12 });
-}
+  // Keep a consistent, fairly dark night overlay (terminator)
+  terminator.setStyle({ fillOpacity: 0.85, fillColor: '#001026' });
+})();
 
 // ── Ring marker ──────────────────────────────────────────────────────
 function showRing(latlng) {
@@ -246,19 +409,82 @@ document.getElementById('lightbox-next').addEventListener('click', () => { if (s
 
 // ── Timeline ──────────────────────────────────────────────────────────
 function updateTimelineThumb(idx) {
-  const total  = state.entries.length - 1;
-  const pct    = total > 0 ? idx / total : 0;
+  // Position the thumb according to real chronological time, not index.
+  let pct = 0;
+  if (state.entryTimes && state.entryTimes.length > 1) {
+    const t = state.entryTimes[idx];
+    const span = state.entryTimeMax - state.entryTimeMin;
+    if (span > 0) pct = (t - state.entryTimeMin) / span;
+    else pct = state.entries.length > 1 ? idx / (state.entries.length - 1) : 0;
+  } else {
+    const total  = state.entries.length - 1;
+    pct = total > 0 ? idx / total : 0;
+  }
   const wrapW  = document.getElementById('timeline-slider-wrap').offsetWidth;
   const offset = pct * (wrapW - 14) + 7;
   tlThumbLabel.style.left = `${offset}px`;
   const e = state.entries[idx];
-  if (e) tlThumbLabel.textContent = `${e.day} ${MONTHS_FR[e.month]}`;
+  if (e) tlThumbLabel.textContent = `${e.day} ${MONTHS_FR[e.month]} · ${e.hour}h${String(e.minute).padStart(2,'0')}`;
+}
+
+function updateTimelineThumbForTime(t) {
+  // place thumb by timestamp
+  if (!state.entryTimes || state.entryTimes.length < 2) {
+    return updateTimelineThumb(0);
+  }
+  const span = state.entryTimeMax - state.entryTimeMin;
+  const pct = span > 0 ? (t - state.entryTimeMin) / span : 0;
+  const wrapW  = document.getElementById('timeline-slider-wrap').offsetWidth;
+  const offset = Math.max(7, Math.min(wrapW - 7, pct * (wrapW - 14) + 7));
+  tlThumbLabel.style.left = `${offset}px`;
+  const cest = new Date(t + 2 * 3600000);
+  const day = cest.getUTCDate();
+  const month = MONTHS_FR[cest.getUTCMonth() + 1];
+  const hour = cest.getUTCHours();
+  const minute = String(cest.getUTCMinutes()).padStart(2, '0');
+  tlThumbLabel.textContent = `${day} ${month} · ${hour}h${minute}`;
 }
 
 function buildTimelineCities(cities, totalEntries) {
+  if (!tlCitiesRow) {
+    console.warn('buildTimelineCities: `timeline-cities-row` not found in DOM');
+    return;
+  }
   tlCitiesRow.innerHTML = '';
+  // find Copenhagen (if present) to avoid duplicate ticks for nearby Malmö
+  const copenhagen = cities.find(v => (v.name || '').toLowerCase().includes('copenh'));
+  const toMeters = (lat1, lon1, lat2, lon2) => {
+    const toRad = a => a * Math.PI / 180;
+    const R = 6371000;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
   cities.filter(c => c.entryIdx != null).forEach(c => {
-    const pct = (c.entryIdx / (totalEntries - 1)) * 100;
+    // Skip Malmö tick when it's effectively overlapping Copenhagen on the timeline
+    if (c.name === 'Malmö' && copenhagen) {
+      const d = toMeters(c.lat, c.lon, copenhagen.lat, copenhagen.lon);
+      if (d < 30000) return;
+    }
+    let pct = 0;
+    if (state.entryTimes && state.entryTimes.length > 1) {
+      const t = state.entryTimes[c.entryIdx];
+      const span = state.entryTimeMax - state.entryTimeMin;
+      pct = span > 0 ? ((t - state.entryTimeMin) / span) * 100 : (c.entryIdx / (totalEntries - 1)) * 100;
+    } else {
+      pct = (c.entryIdx / (totalEntries - 1)) * 100;
+    }
+    // Only add a city tick when the matched entry has a video file
+    // whose filename encodes the exact timestamp of that entry, to avoid
+    // creating ticks that point to a different time-coded video.
+    const entry = state.entries && state.entries[c.entryIdx];
+    if (entry && entry.url) {
+      const m = String(entry.url).match(/(\d{2})(\d{2})_(\d{2})(\d{2})/);
+      const matchesTime = m && Number(m[1]) === Number(entry.day) && Number(m[2]) === Number(entry.month) && Number(m[3]) === Number(entry.hour) && Number(m[4]) === Number(entry.minute);
+      if (!matchesTime) return; // skip this city tick
+    }
     const div = document.createElement('div');
     div.className = 'tl-city-tick';
     div.style.left = `${pct}%`;
@@ -281,6 +507,71 @@ function nearestPhotoIdx(entryIdx) {
   const a = lo > 0 ? lo - 1 : 0;
   const b = lo < photos.length ? lo : photos.length - 1;
   return Math.abs(photos[a].entryIdx - entryIdx) <= Math.abs(photos[b].entryIdx - entryIdx) ? a : b;
+}
+
+// Convert an arbitrary time (ms since epoch) to the nearest entry index using binary search
+function timeToIndex(t) {
+  const times = state.entryTimes;
+  if (!times || times.length === 0) return 0;
+  let lo = 0, hi = times.length - 1;
+  if (t <= times[0]) return 0;
+  if (t >= times[hi]) return hi;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] === t) return mid;
+    if (times[mid] < t) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  // lo is the first index with times[lo] > t, hi = lo-1
+  const a = Math.max(0, hi);
+  const b = Math.min(times.length - 1, lo);
+  return (Math.abs(times[a] - t) <= Math.abs(times[b] - t)) ? a : b;
+}
+
+// Interpolate geographic position (and basic fields) for an arbitrary timestamp
+function interpolatePosition(t) {
+  const times = state.entryTimes;
+  const entries = state.entries;
+  if (!times || times.length === 0) return null;
+  if (t <= times[0]) return { lat: entries[0].lat, lon: entries[0].lon, idx: 0 };
+  const n = times.length - 1;
+  if (t >= times[n]) return { lat: entries[n].lat, lon: entries[n].lon, idx: n };
+  // find hi = first index with times[hi] > t
+  let lo = 0, hi = n;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] <= t) lo = mid + 1;
+    else hi = mid;
+  }
+  const a = Math.max(0, lo - 1);
+  const b = lo;
+  const ta = times[a], tb = times[b];
+  const frac = tb === ta ? 0 : (t - ta) / (tb - ta);
+  const lat = entries[a].lat + frac * (entries[b].lat - entries[a].lat);
+  const lon = entries[a].lon + frac * (entries[b].lon - entries[a].lon);
+  return { lat, lon, a, b, frac };
+}
+
+function previewAtTime(t) {
+  const ip = interpolatePosition(t);
+  if (!ip) return;
+  // update ring marker position without opening panel
+  try { showRing([ip.lat, ip.lon]); } catch (e) { /* ignore */ }
+  // update terminator to that exact time
+  scheduleTerminatorUpdate(new Date(t));
+  // compute sun elevation at this time and place
+  let elev = 0;
+  if (window.SunCalc) {
+    const pos = SunCalc.getPosition(new Date(t), ip.lat, ip.lon);
+    elev = pos.altitude * 180 / Math.PI;
+  } else {
+    // fall back to approximate hour/min interpolation
+    const cest = new Date(t + 2 * 3600000);
+    elev = sunElevationDeg(ip.lat, ip.lon, cest.getUTCDate(), cest.getUTCMonth() + 1, cest.getUTCHours(), cest.getUTCMinutes());
+  }
+  applyDaylight(elev);
+  // update date display on thumb
+  updateTimelineThumbForTime(t);
 }
 
 function scrollCarouselTo(pi) {
@@ -311,17 +602,34 @@ function selectEntry(idx) {
 
   showRing([e.lat, e.lon]);
   // Date UTC du moment (voyage en CEST = UTC+2)
-  terminator.setTime(new Date(Date.UTC(2024, e.month - 1, e.day, e.hour - 2, e.minute)));
+  scheduleTerminatorUpdate(new Date(Date.UTC(2024, e.month - 1, e.day, e.hour - 2, e.minute)));
   applyDaylight(sunElevationDeg(e.lat, e.lon, e.day, e.month, e.hour, e.minute));
   scrollCarouselTo(nearestPhotoIdx(idx));
   if (!map.getBounds().contains([e.lat, e.lon])) {
     map.panTo([e.lat, e.lon], { animate: true, duration: 0.4 });
   }
 
-  openPanel();
-  updatePanel(e, idx);
+  // If this entry has a video URL, open the video panel as before.
+  // Otherwise, avoid opening an empty video panel; if photos exist for
+  // this entry, open the lightbox to show them. If neither video nor
+  // photos are available, just show the ring and pan without opening UI.
+  if (e.url) {
+    openPanel();
+    updatePanel(e, idx);
+  } else {
+    // Do not open photos automatically when there's no video for this entry.
+    // Close any open panel and ensure the player is stopped/cleared.
+    try {
+      closePanel();
+      player.pause();
+      player.removeAttribute('src');
+      player.load();
+    } catch (err) { /* ignore */ }
+  }
 
-  tlInput.value = idx;
+  // Keep the slider value time-based (ms UTC) so spacing reflects real time
+  if (state.entryTimes && state.entryTimes[idx] != null) tlInput.value = state.entryTimes[idx];
+  else tlInput.value = idx;
   updateTimelineThumb(idx);
 }
 
@@ -375,6 +683,69 @@ async function init() {
   state.entries = entries;
   state.photos  = photos;
   state.cities  = cities;
+  // Remove video URLs from entries when the filename's timestamp does not
+  // exactly match the entry timestamp. This prevents linking interpolated
+  // points to a video that was recorded at a different timecode.
+  const filenameEncodesEntry = (url, e) => {
+    if (!url) return false;
+    const m = String(url).match(/(\d{2})(\d{2})_(\d{2})(\d{2})/);
+    if (!m) return false;
+    const d = Number(m[1]), mo = Number(m[2]), h = Number(m[3]), mi = Number(m[4]);
+    return d === Number(e.day) && mo === Number(e.month) && h === Number(e.hour) && mi === Number(e.minute);
+  };
+  entries.forEach(e => {
+    if (e.url && !filenameEncodesEntry(e.url, e)) {
+      // clear the url so the rest of the app treats this entry as having no video
+      console.debug('Clearing mismatched video URL for entry', e.id || '(no id)', `${e.day}/${e.month} ${e.hour}:${e.minute}`, '->', e.url);
+      e.url = null;
+    }
+  });
+  // Precompute entry timestamps (UTC). Entries recorded in CEST (UTC+2),
+  // convert by subtracting 2 hours so spacing on timeline matches real time.
+  const year = entries[0]?.year || 2024;
+  state.entryTimes = entries.map(e => Date.UTC(year, e.month - 1, e.day, (e.hour || 0) - 2, e.minute || 0));
+  state.entryTimeMin = Math.min(...state.entryTimes);
+  state.entryTimeMax = Math.max(...state.entryTimes);
+
+  // Initialize terminator geometry once the map is ready using the first
+  // available entry timestamp so no `current` date is loaded at module init.
+  const firstT = state.entryTimeMin || Date.now();
+  map.whenReady(() => scheduleTerminatorUpdate(new Date(firstT)));
+
+  // If the travel data contains an entry on June 21, compute the terminator
+  // opacity used for that entry and lock it for all timeline previews so the
+  // shadow/terminator appearance remains constant across time.
+  try {
+    const june21 = entries.find(e => Number(e.day) === 21 && Number(e.month) === 6);
+    if (june21) {
+      // compute elevation for that entry (use same fallback as elsewhere)
+      let elev = 0;
+      if (window.SunCalc) {
+        const pos = SunCalc.getPosition(new Date(Date.UTC(year, june21.month - 1, june21.day, (june21.hour || 0) - 2, june21.minute || 0)), june21.lat, june21.lon);
+        elev = pos.altitude * 180 / Math.PI;
+      } else {
+        elev = sunElevationDeg(june21.lat, june21.lon, june21.day, june21.month, june21.hour || 0, june21.minute || 0);
+      }
+      // reuse computeTermOpacity logic by calling applyDaylight once and
+      // reading the style — but because applyDaylight now respects fixedTermOp
+      // we must compute value locally. Re-implement computeTermOpacity here.
+      const NO_DARK_thresh = -3; const FULL_NIGHT_thresh = -12;
+      let t;
+      if (elev >= NO_DARK_thresh) t = 0;
+      else if (elev <= FULL_NIGHT_thresh) t = 1;
+      else t = (NO_DARK_thresh - elev) / (NO_DARK_thresh - FULL_NIGHT_thresh);
+      t = t * t * (3 - 2 * t);
+      const baseOp = 0.20; const extra = 0.60;
+      fixedTermOp = Math.max(0, Math.min(0.8, baseOp + t * extra));
+      // Override to a stronger (darker) fixed opacity as requested
+      fixedTermOp = 0.7;
+      // Force the terminator to use this opacity immediately
+      if (terminator) terminator.setStyle({ fillOpacity: fixedTermOp, fillColor: '#000412' });
+      console.info('Fixed terminator opacity overridden to:', fixedTermOp);
+    }
+  } catch (err) {
+    console.warn('Could not compute fixed terminator opacity for June 21', err);
+  }
 
   // Carousel
   const carousel = document.getElementById('photo-carousel');
@@ -406,11 +777,16 @@ async function init() {
         img.src = p.src;
       }
     };
-    fragment.appendChild(img);
-  });
-  carousel.appendChild(fragment);
-  state.thumbEls = Array.from(carousel.querySelectorAll('.photo-thumb'));
-  state.thumbEls.forEach(img => thumbObserver.observe(img));
+      fragment.appendChild(img);
+    });
+    if (carousel) {
+      carousel.appendChild(fragment);
+      state.thumbEls = Array.from(carousel.querySelectorAll('.photo-thumb'));
+      state.thumbEls.forEach(img => thumbObserver.observe(img));
+    } else {
+      console.warn('photo-carousel element not found; skipping thumbnail setup');
+      state.thumbEls = [];
+    }
 
   // Nearest entryIdx for each city (cities.json + visited.json)
   const assignEntryIdx = arr => arr.forEach(c => {
@@ -463,15 +839,47 @@ async function init() {
 
   // Tick labels every 10 minutes
   let lastTick = -1;
+  // Build set of entries that actually have media (photos or video URL)
+  const mediaEntries = new Set();
+  photos.forEach(p => { if (p.entryIdx != null) mediaEntries.add(p.entryIdx); });
+  entries.forEach((e, i) => { if (e.url) mediaEntries.add(i); });
   entries.forEach((e, i) => {
     const slot = e.hour * 6 + Math.floor(e.minute / 10);
     if (slot === lastTick) return;
     lastTick = slot;
+    // Skip tick markers for approximated/interpolated entries unless they have
+    // an exact video filename matching this entry's timestamp.
+    if (e.frame === 0) {
+      let hasExactVideo = false;
+      if (e.url) {
+        const m = String(e.url).match(/(\d{2})(\d{2})_(\d{2})(\d{2})/);
+        if (m) {
+          const d = Number(m[1]), mo = Number(m[2]), h = Number(m[3]), mi = Number(m[4]);
+          if (d === Number(e.day) && mo === Number(e.month) && h === Number(e.hour) && mi === Number(e.minute)) hasExactVideo = true;
+        }
+      }
+      if (!hasExactVideo) return;
+    }
     const label = `${e.day} ${MONTHS_FR[e.month]} · ${e.hour}h${String(e.minute).padStart(2,'0')}`;
+    // Show the small dot only when the video's filename encodes the exact timestamp
+    // of this entry (format like "DDMM_HHMM" e.g. 1806_0938 for 18/06 09:38).
+    let dotHtml = '';
+    if (e.url) {
+      const m = String(e.url).match(/(\d{2})(\d{2})_(\d{2})(\d{2})/);
+      if (m) {
+        const d = Number(m[1]);
+        const mo = Number(m[2]);
+        const h = Number(m[3]);
+        const mi = Number(m[4]);
+        if (d === Number(e.day) && mo === Number(e.month) && h === Number(e.hour) && mi === Number(e.minute)) {
+          dotHtml = '<div class="time-tick-dot"></div>';
+        }
+      }
+    }
     L.marker([e.lat, e.lon], {
       icon: L.divIcon({
         className: 'time-tick',
-        html: `<div class="time-tick-dot"></div><div class="time-tick-label">${label}</div>`,
+        html: `${dotHtml}<div class="time-tick-label">${label}</div>`,
         iconSize: [0, 0],
         iconAnchor: [0, 0],
       }),
@@ -485,25 +893,157 @@ async function init() {
   map.fitBounds(L.latLngBounds(latlngs), { padding: [20,20] });
 
   // Visited city labels
+  // Add city labels into the high-z-index `labelsPane` so they sit above routes
+  // Skip labeling Malmö when it is effectively overlapping with Copenhagen
+  const copenhagen = visited.find(v => (v.name || '').toLowerCase().includes('copenh'));
+  function haversine_meters(lat1, lon1, lat2, lon2) {
+    const toRad = a => a * Math.PI / 180;
+    const R = 6371000; // meters
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
   visited.forEach(c => {
+    // If this is Malmö and Copenhagen exists nearby, skip the label to avoid overlap
+    if (c.name === 'Malmö' && copenhagen) {
+      const d = haversine_meters(c.lat, c.lon, copenhagen.lat, copenhagen.lon);
+      if (d < 30000) return; // skip Malmö label when within 30 km of Copenhagen
+    }
     L.marker([c.lat, c.lon], {
+      pane: 'labelsPane',
       icon: L.divIcon({ className: 'city-label', html: c.name, iconAnchor: [0, 0] }),
       interactive: false,
     }).addTo(map);
   });
 
-
-
+  // (VectorGrid demo removed — using raster tiles + hillshade overlay instead)
   // Timeline
   tlInput.max = entries.length - 1;
-  tlInput.value = 0;
+  // Make the timeline input represent real time (ms UTC) so gaps are shown
+  if (state.entryTimes && state.entryTimes.length > 1) {
+    tlInput.min = state.entryTimeMin;
+    tlInput.max = state.entryTimeMax;
+    // step of 1 minute to keep slider reasonably responsive
+    tlInput.step = 60000;
+    tlInput.value = state.entryTimeMin;
+  } else {
+    tlInput.min = 0;
+    tlInput.max = entries.length - 1;
+    tlInput.step = 1;
+    tlInput.value = 0;
+  }
   updateTimelineThumb(0);
   buildTimelineCities(visited, entries.length);
 
+  // Add explicit date markers for Lødingen (26/06 22:00) and Malmö (08/07 09:41)
+  function addDateMarker(day, month, hour, minute, label) {
+    if (!tlCitiesRow) return;
+    const year = state.entries[0]?.year || 2024;
+    // convert CEST (UTC+2) entry time into ms UTC to match state.entryTimes
+    const t = Date.UTC(year, month - 1, day, hour - 2, minute);
+    const idx = timeToIndex(t);
+    // compute pct position across timeline using entryTimes
+    let pct = 0;
+    if (state.entryTimes && state.entryTimes.length > 1) {
+      const span = state.entryTimeMax - state.entryTimeMin;
+      const tt = state.entryTimes[idx];
+      pct = span > 0 ? ((tt - state.entryTimeMin) / span) * 100 : (idx / (state.entries.length - 1)) * 100;
+    } else {
+      pct = (idx / (state.entries.length - 1)) * 100;
+    }
+    const div = document.createElement('div');
+    div.className = 'tl-city-tick';
+    div.style.left = `${pct}%`;
+    // Only show the city name (strip any appended date after ' · ')
+    const displayName = (label || '').split(' · ')[0];
+    div.innerHTML = `<div class="tick-line"></div><div class="tick-name">${displayName}</div>`;
+    tlCitiesRow.appendChild(div);
+  }
+  // Lødingen: 26 June 22:00 (CEST)
+  addDateMarker(26, 6, 22, 0, 'Lødingen · 26/06 22:00');
+  // Malmö: 08 July 09:41 (CEST)
+  addDateMarker(8, 7, 9, 41, 'Malmö · 08/07 09:41');
+
+  // Auto-slide animation id (for requestAnimationFrame)
+  let autoSlideRAF = null;
+  function cancelAutoSlide() {
+    if (autoSlideRAF) {
+      cancelAnimationFrame(autoSlideRAF);
+      autoSlideRAF = null;
+    }
+  }
+  // Animate numeric value from `from` to `to` over `duration` ms, calling onUpdate(value)
+  // on each frame and onEnd() when finished.
+  function animateToTime(from, to, duration, onUpdate, onEnd) {
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - start) / duration);
+      // ease-in-out (cosine)
+      const eased = (1 - Math.cos(Math.PI * t)) / 2;
+      const val = from + (to - from) * eased;
+      onUpdate(val);
+      if (t < 1) {
+        autoSlideRAF = requestAnimationFrame(step);
+      } else {
+        autoSlideRAF = null;
+        if (onEnd) onEnd();
+      }
+    }
+    cancelAutoSlide();
+    autoSlideRAF = requestAnimationFrame(step);
+  }
+
   tlInput.addEventListener('input', () => {
-    const idx = Number(tlInput.value);
-    updateTimelineThumb(idx);
-    selectEntry(idx);
+    // User is actively dragging — cancel any pending auto-slide
+    cancelAutoSlide();
+    if (state.entryTimes && state.entryTimes.length > 1) {
+      const t = Number(tlInput.value);
+      // continuous preview while dragging: interpolate position and update terminator
+      previewAtTime(t);
+      updateTimelineThumbForTime(t);
+    } else {
+      const idx = Number(tlInput.value);
+      updateTimelineThumb(idx);
+      selectEntry(idx);
+    }
+  });
+  // On change (release), if the released time isn't exactly an event timestamp,
+  // animate the slider toward the nearest event over 2s, updating preview continuously.
+  tlInput.addEventListener('change', () => {
+    if (state.entryTimes && state.entryTimes.length > 1) {
+      const t = Number(tlInput.value);
+      const tIdx = timeToIndex(t);
+      // Prefer selecting an entry that actually has media (video/photo).
+      // Use time-distance (ms) to find the closest media-bearing entry to the
+      // released timestamp `t` rather than relying on index distance which can
+      // be misleading when there are irregular time gaps.
+      let idx = tIdx;
+      if (typeof mediaEntries !== 'undefined' && mediaEntries.size > 0) {
+        let best = null;
+        let bestDt = Infinity;
+        for (const i of mediaEntries) {
+          // ensure bounds safety
+          if (i < 0 || i >= state.entryTimes.length) continue;
+          const dt = Math.abs(state.entryTimes[i] - t);
+          if (dt < bestDt) { bestDt = dt; best = i; }
+        }
+        if (best !== null) idx = best;
+      }
+      const target = state.entryTimes[idx];
+      if (t === target) {
+        selectEntry(idx);
+        return;
+      }
+      // 2000 ms slide animation toward the chosen target
+      animateToTime(t, target, 2000, (val) => {
+        const v = Math.round(val);
+        tlInput.value = v;
+        previewAtTime(v);
+        updateTimelineThumbForTime(v);
+      }, () => selectEntry(idx));
+    }
   });
 
   // Panel controls
@@ -532,7 +1072,7 @@ async function init() {
   const routeBounds = L.latLngBounds(entries.map(e => [e.lat, e.lon])).pad(0.15);
 
   function enterImmersive() {
-    stage.appendChild(player);
+    if (stage) stage.appendChild(player);
     document.body.classList.add('immersive');
     map.setMaxBounds(routeBounds);
     setTimeout(() => {
@@ -575,7 +1115,7 @@ async function init() {
   function isMobileLandscape() { return mqlMobile.matches; }
 
   function enterMobileLandscape() {
-    mobileLeft.appendChild(player);
+    if (mobileLeft) mobileLeft.appendChild(player);
     map.setMaxBounds(routeBounds);
     setTimeout(() => {
       map.invalidateSize();
@@ -616,16 +1156,16 @@ async function init() {
   function mobShowVideo() {
     mobBtnVideo.classList.add('active');
     mobBtnPhotos.classList.remove('active');
-    if (mobilePhotoStrip && mobileLeft.contains(mobilePhotoStrip)) mobileLeft.removeChild(mobilePhotoStrip);
-    mobileLeft.appendChild(player);
+    if (mobilePhotoStrip && mobileLeft && mobileLeft.contains(mobilePhotoStrip)) mobileLeft.removeChild(mobilePhotoStrip);
+    if (mobileLeft) mobileLeft.appendChild(player);
   }
 
   function mobShowPhotos() {
     mobBtnPhotos.classList.add('active');
     mobBtnVideo.classList.remove('active');
-    if (mobileLeft.contains(player)) mobileLeft.removeChild(player);
+    if (mobileLeft && mobileLeft.contains(player)) mobileLeft.removeChild(player);
     buildMobilePhotoStrip();
-    mobileLeft.appendChild(mobilePhotoStrip);
+    if (mobileLeft) mobileLeft.appendChild(mobilePhotoStrip);
     if (state.activePhotoIdx !== null) {
       const step = 124;
       mobilePhotoStrip.scrollTo({ left: state.activePhotoIdx * step + step / 2, behavior: 'smooth' });

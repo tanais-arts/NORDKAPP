@@ -3,6 +3,8 @@
   --bg:      rgba(8,12,20,1);
   --chrome:  rgba(4,6,14,0.92);
   --panel:   rgba(6,9,18,0.97);
+  /* deeper blue-night tint for photo and timeline banners */
+  --banner-bg: rgba(6,18,34,0.97);
   --border:  rgba(255,255,255,0.07);
   --borderf: rgba(255,255,255,0.05);
   --text1:   rgba(240,240,240,1);
@@ -121,7 +123,7 @@ html, body {
 #photo-bar {
   position: fixed; top: 0; left: 0; right: 0;
   height: 100px; z-index: 400;
-  background: var(--chrome);
+  background: var(--banner-bg) !important;
   border-bottom: 1px solid var(--borderf);
   backdrop-filter: blur(10px);
   transition: background 1.4s ease, border-color 1.4s ease;
@@ -161,6 +163,12 @@ html, body {
   position: fixed;
   top: 100px; left: 0; right: 0; bottom: 100px;
   z-index: 0;
+}
+
+/* Soft blur for terminator polygon to feather the day/night edge */
+.nk-terminator {
+  filter: url(#nk-blur);
+  -webkit-filter: url(#nk-blur);
 }
 
 /* ── HEADER ─────────────────────────────────────────── */
@@ -388,7 +396,7 @@ body.immersive .leaflet-control-attribution { display: none; }
 #timeline-bar {
   display: flex; align-items: center; gap: 10px;
   padding: 0 16px; height: 100px;
-  background: var(--chrome);
+  background: var(--banner-bg) !important;
   border-top: 1px solid var(--borderf);
   backdrop-filter: blur(10px);
   transition: background 1.4s ease, border-color 1.4s ease;
