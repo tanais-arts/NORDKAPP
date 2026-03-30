@@ -462,8 +462,15 @@ function buildTimelineCities(cities, totalEntries) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
+  // Afficher les ticks classiques pour toutes les villes SAUF celles déjà présentes comme escale
+  let escaleCities = [];
+  if (window.escales && Array.isArray(window.escales)) {
+    escaleCities = window.escales.map(e => (e.city || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''));
+  }
   cities.filter(c => c.entryIdx != null).forEach(c => {
-    // Skip Malmö tick when it's effectively overlapping Copenhagen on the timeline
+    // Ne pas afficher le tick classique si la ville est une escale (pour éviter doublon)
+    const cname = (c.name || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    if (escaleCities.includes(cname)) return;
     if (c.name === 'Malmö' && copenhagen) {
       const d = toMeters(c.lat, c.lon, copenhagen.lat, copenhagen.lon);
       if (d < 30000) return;
@@ -476,21 +483,42 @@ function buildTimelineCities(cities, totalEntries) {
     } else {
       pct = (c.entryIdx / (totalEntries - 1)) * 100;
     }
-    // Only add a city tick when the matched entry has a video file
-    // whose filename encodes the exact timestamp of that entry, to avoid
-    // creating ticks that point to a different time-coded video.
     const entry = state.entries && state.entries[c.entryIdx];
     if (entry && entry.url) {
       const m = String(entry.url).match(/(\d{2})(\d{2})_(\d{2})(\d{2})/);
       const matchesTime = m && Number(m[1]) === Number(entry.day) && Number(m[2]) === Number(entry.month) && Number(m[3]) === Number(entry.hour) && Number(m[4]) === Number(entry.minute);
-      if (!matchesTime) return; // skip this city tick
+      if (!matchesTime) return;
     }
     const div = document.createElement('div');
     div.className = 'tl-city-tick';
     div.style.left = `${pct}%`;
-    div.innerHTML = `<div class="tick-line"></div><div class="tick-name">${c.name}</div>`;
+    div.innerHTML = `<div class=\"tick-line\"></div><div class=\"tick-name\">${c.name}</div>`;
     tlCitiesRow.appendChild(div);
   });
+
+  // Ajouter en plus les ticks centrés pour chaque escale (classe spéciale)
+  if (window.escales && Array.isArray(window.escales) && state.entryTimes && state.entryTimes.length > 1) {
+    const span = state.entryTimeMax - state.entryTimeMin;
+    window.escales.forEach(e => {
+      function parseISOtoUTC(str) {
+        const d = new Date(str + 'Z');
+        d.setUTCHours(d.getUTCHours() - 2);
+        return d.getTime();
+      }
+      const t0 = parseISOtoUTC(e.start);
+      const t1 = parseISOtoUTC(e.end);
+      let pct0 = span > 0 ? ((t0 - state.entryTimeMin) / span) : 0;
+      let pct1 = span > 0 ? ((t1 - state.entryTimeMin) / span) : 0;
+      pct0 = Math.max(0, Math.min(1, pct0));
+      pct1 = Math.max(0, Math.min(1, pct1));
+      const pct = ((pct0 + pct1) / 2) * 100;
+      const div = document.createElement('div');
+      div.className = 'tl-city-tick tl-escale-city-tick';
+      div.style.left = `${pct}%`;
+      div.innerHTML = `<div class=\"tick-line\"></div><div class=\"tick-name\">${e.city}</div>`;
+      tlCitiesRow.appendChild(div);
+    });
+  }
 }
 
 // ── Carousel ──────────────────────────────────────────────────────────
@@ -667,19 +695,106 @@ function updatePanel(e, idx) {
 
 // ── Init ──────────────────────────────────────────────────────────────
 async function init() {
-  let entries, photos, cities, visited;
+  let entries, photos, cities, visited, escales;
   try {
-    [entries, photos, cities, visited] = await Promise.all([
+    [entries, photos, cities, visited, escales] = await Promise.all([
       fetch('travel.json?v=1774802661').then(r => r.json()),
       fetch('photos.json?v=1774804575').then(r => r.json()),
       fetch('cities.json?v=1774802661').then(r => r.json()),
       fetch('visited.json').then(r => r.json()),
+      fetch('escales.json').then(r => r.json()),
     ]);
+    window.escales = escales; // <--- Ajouté pour rendre escales global et accessible partout
   } catch (err) {
     console.error('Impossible de charger les données', err);
     return;
   }
   if (!entries.length) return;
+    // ── Timeline Base Line (always visible) ──
+    function renderTimelineBaseLine() {
+      const wrap = document.getElementById('timeline-slider-wrap');
+      if (!wrap) return;
+      let base = wrap.querySelector('.tl-base-line');
+      if (!base) {
+        base = document.createElement('div');
+        base.className = 'tl-base-line';
+        wrap.insertBefore(base, wrap.firstChild);
+      }
+      // full width, centered vertically
+      base.style.position = 'absolute';
+      base.style.left = '0';
+      base.style.width = '100%';
+      base.style.top = '50%';
+      base.style.height = '2px';
+      base.style.transform = 'translateY(-50%)';
+      base.style.background = 'rgba(240,192,96,0.75)'; // gold, same as city names
+      base.style.zIndex = '0';
+      base.style.pointerEvents = 'none';
+    }
+
+    // ── Timeline Escale Highlights ──
+    // Render thick highlight bars for escale periods
+    function renderTimelineEscales(escales, entryTimes, entryTimeMin, entryTimeMax) {
+      const wrap = document.getElementById('timeline-slider-wrap');
+      if (!wrap || !escales || !entryTimes || entryTimes.length < 2) return;
+      // Remove previous highlights if any
+      Array.from(wrap.querySelectorAll('.tl-escale-bar')).forEach(el => el.remove());
+      const span = entryTimeMax - entryTimeMin;
+      escales.forEach(e => {
+        // Corrige le placement : les timestamps dans escales.json sont en CEST (UTC+2), il faut les convertir en UTC
+        function parseCESTtoUTC(str) {
+          // str: "2024-06-13T18:00:00" (CEST)
+          const d = new Date(str + 'Z'); // parse as UTC
+          // retire 2h pour obtenir UTC
+          d.setUTCHours(d.getUTCHours() - 2);
+          return d.getTime();
+        }
+        const t0 = parseCESTtoUTC(e.start);
+        const t1 = parseCESTtoUTC(e.end);
+        if (isNaN(t0) || isNaN(t1)) return;
+        let pct0 = (t0 - entryTimeMin) / span;
+        let pct1 = (t1 - entryTimeMin) / span;
+        pct0 = Math.max(0, Math.min(1, pct0));
+        pct1 = Math.max(0, Math.min(1, pct1));
+        if (pct1 <= pct0) return;
+        // Create a background cover to hide the base line under the escale
+        const cover = document.createElement('div');
+        cover.className = 'tl-escale-cover';
+        cover.style.position = 'absolute';
+        cover.style.left = (pct0 * 100) + '%';
+        cover.style.width = ((pct1 - pct0) * 100) + '%';
+        cover.style.top = '50%';
+        cover.style.height = '6px'; // same as escale bar
+        cover.style.marginTop = '-2px'; // align with escale bar
+        cover.style.transform = 'translateY(-16%)'; // align with escale bar
+        cover.style.background = 'rgba(240,192,96,1)';
+        cover.style.zIndex = '1';
+        cover.style.pointerEvents = 'none';
+        wrap.appendChild(cover);
+
+        // Foreground escale bar (thick, gold)
+        const bar = document.createElement('div');
+        bar.className = 'tl-escale-bar';
+        bar.title = `${e.city} — ${e.duration_h}h`;
+        bar.style.position = 'absolute';
+        bar.style.left = (pct0 * 100) + '%';
+        bar.style.width = ((pct1 - pct0) * 100) + '%';
+        bar.style.top = '50%';
+        bar.style.height = '6px'; // 3x thicker than base line (2px)
+        bar.style.marginTop = '-2px'; // align top edge with base line
+        bar.style.transform = 'translateY(-16%)'; // fine-tune centering on base line
+        bar.style.background = 'rgba(240,192,96,1)';
+        bar.style.borderRadius = '3px';
+        bar.style.zIndex = '2'; // above cover and base line
+        bar.style.boxShadow = '0 0 2px 0px rgba(240,192,96,0.10)';
+        wrap.appendChild(bar);
+      });
+    }
+    // Render base line and escale highlights after timeline is set up
+    setTimeout(() => {
+      renderTimelineBaseLine();
+      renderTimelineEscales(escales, state.entryTimes, state.entryTimeMin, state.entryTimeMax);
+    }, 0);
   state.entries = entries;
   state.photos  = photos;
   state.cities  = cities;
@@ -1008,6 +1123,12 @@ async function init() {
       updateTimelineThumb(idx);
       selectEntry(idx);
     }
+    // Re-render escale highlights in case of resize
+    renderTimelineEscales(escales, state.entryTimes, state.entryTimeMin, state.entryTimeMax);
+    // Re-render escale highlights on resize
+    window.addEventListener('resize', () => {
+      renderTimelineEscales(escales, state.entryTimes, state.entryTimeMin, state.entryTimeMax);
+    });
   });
   // On change (release), if the released time isn't exactly an event timestamp,
   // animate the slider toward the nearest event over 2s, updating preview continuously.

@@ -1,3 +1,45 @@
+/* Ticks d'escale centrés (ajoutés dynamiquement) */
+.tl-escale-city-tick .tick-line {
+  width: 3px;
+  left: -1px;
+  background: #f0c060;
+  opacity: 1;
+  height: 14px;
+  z-index: 3;
+}
+.tl-escale-city-tick .tick-name {
+  color: #f0c060;
+  font-weight: bold;
+  font-size: 0.65rem;
+  text-shadow: 0 0 2px #fff8;
+  opacity: 1;
+}
+.tl-escale-cover {
+  position: absolute;
+  background: rgba(240,192,96,1);
+  z-index: 1;
+  pointer-events: none;
+}
+/* Timeline escale highlight bar */
+.tl-base-line {
+  position: absolute;
+  left: 0; width: 100%;
+  top: 50%; height: 2px;
+  background: rgba(240,192,96,1); /* gold, same as escale bars */
+  z-index: 0;
+  pointer-events: none;
+}
+.tl-escale-bar {
+  pointer-events: auto;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: box-shadow 0.18s, opacity 0.18s;
+  /* thickness and margin set inline for precise alignment */
+}
+.tl-escale-bar:hover {
+  opacity: 1;
+  box-shadow: 0 0 6px 2px rgba(240,192,96,0.18);
+}
 /* ── THEME VARIABLES (interpolées en JS selon élévation solaire) ─── */
 :root {
   --bg:      rgba(8,12,20,1);
