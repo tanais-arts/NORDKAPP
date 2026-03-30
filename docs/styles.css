@@ -260,11 +260,12 @@ body.panel-open #panel { transform: translateX(0); }
 }
 
 #panel-date {
-  padding: 14px 24px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  position: absolute;
+  bottom: 100px;
+  left: 16px;
   display: flex; align-items: baseline; gap: 5px;
-  transition: border-color 1.4s ease;
+  z-index: 401;
+  pointer-events: none;
 }
 #date-day   { font-size: 1.1rem; font-weight: 700; color: var(--accT); transition: color 1.4s ease; }
 #date-month { font-size: 1.1rem; font-weight: 300; color: var(--text2); text-transform: lowercase; transition: color 1.4s ease; }
