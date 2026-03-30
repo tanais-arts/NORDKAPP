@@ -1306,7 +1306,11 @@ async function init() {
   const routeBounds = L.latLngBounds(entries.map(e => [e.lat, e.lon])).pad(0.15);
 
   function enterImmersive() {
-    if (stage) stage.appendChild(player);
+    const mapEl = document.getElementById('map');
+    if (stage) {
+      stage.appendChild(player);
+      stage.appendChild(mapEl);
+    }
     document.body.classList.add('immersive');
     map.setMaxBounds(routeBounds);
     setTimeout(() => {
@@ -1319,7 +1323,10 @@ async function init() {
   }
 
   function exitImmersive() {
+    const mapEl = document.getElementById('map');
+    const photoBar = document.getElementById('photo-bar');
     videoWrap.insertBefore(player, toolbar);
+    document.body.insertBefore(mapEl, photoBar);
     document.body.classList.remove('immersive');
     map.setMaxBounds(null);
     setTimeout(() => map.invalidateSize(), 50);
