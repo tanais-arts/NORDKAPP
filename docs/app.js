@@ -1299,15 +1299,6 @@ async function init() {
   document.getElementById('carousel-prev').addEventListener('click', () => carouselEl.scrollBy({ left: -4 * THUMB_STEP, behavior: 'smooth' }));
   document.getElementById('carousel-next').addEventListener('click', () => carouselEl.scrollBy({ left:  4 * THUMB_STEP, behavior: 'smooth' }));
 
-  // Rate
-  const rateSlider  = document.getElementById('rate-slider');
-  const rateDisplay = document.getElementById('rate-display');
-  rateSlider.addEventListener('input', () => {
-    const r = parseFloat(rateSlider.value);
-    rateDisplay.textContent = `${r}×`;
-    player.playbackRate = r;
-  });
-
   // Mode immersif
   const stage     = document.getElementById('video-stage');
   const videoWrap = document.getElementById('video-wrap');
@@ -1352,8 +1343,6 @@ async function init() {
     const cur = rateRates.indexOf(parseFloat(stageRateBtn.textContent));
     const next = rateRates[(cur + 1) % rateRates.length];
     player.playbackRate = next;
-    document.getElementById('rate-display').textContent = `${next}×`;
-    document.getElementById('rate-slider').value = next;
     stageRateBtn.textContent = `${next}×`;
   });
 
