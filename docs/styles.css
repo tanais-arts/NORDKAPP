@@ -93,7 +93,16 @@
 #rotate-sub { font-size: 0.85rem; color: var(--text4); letter-spacing: 0.08em; }
 
 @media (orientation: portrait) and (max-width: 1024px) {
-  #rotate-overlay { display: flex; }
+  /* Layout portrait utilisable : carte + timeline */
+  #rotate-overlay { display: none; }
+  #photo-bar, #title-bar, #panel, #mobile-toggle, #mobile-title-bar { display: none !important; }
+  #map {
+    top: 0 !important; left: 0 !important;
+    right: 0 !important; bottom: 100px !important;
+    width: 100% !important;
+  }
+  #bottom-bar { left: 0; right: 0; }
+  #timeline-bar { height: 100px; }
 }
 
 /* ── MOBILE LANDSCAPE ───────────────────────────────── */
@@ -101,7 +110,7 @@
 
 @media (orientation: landscape) and (max-height: 500px) {
   /* Masquer les éléments desktop */
-  #photo-bar, #title-bar, #panel, #btn-immersive { display: none !important; }
+  #photo-bar, #title-bar, #panel, #btn-immersive, #panel-date { display: none !important; }
   #timeline-cities-row { display: none; }
 
   /* Carte : côté droit */
@@ -261,7 +270,8 @@ body.panel-open #panel { transform: translateX(0); }
 
 #panel-date {
   position: absolute;
-  bottom: 100px;
+  bottom: 100%;
+  margin-bottom: 8px;
   left: 16px;
   display: flex; align-items: baseline; gap: 5px;
   z-index: 401;
