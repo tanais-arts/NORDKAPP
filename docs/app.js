@@ -1038,9 +1038,15 @@ async function init() {
   };
   entries.forEach((e, i) => {
     const interp = e.frame === 0;
-    // Couper la trace sur les trous GPS (saut > seuil)
+    // Couper la trace sur les trous GPS (saut > seuil) — relier par un trait fin tireté
     if (i > 0 && gapKm(entries[i - 1], e) > GAP_THRESHOLD_KM) {
+      const lastPt = curSeg.length > 0 ? curSeg[curSeg.length - 1] : null;
       flushSeg(curInterp);
+      if (lastPt) {
+        L.polyline([lastPt, [e.lat, e.lon]], { color: ACCENT, weight: 2, opacity: 1, dashArray: '6 6', smoothFactor: 1 })
+          .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
+          .addTo(map);
+      }
       curSeg = [];
       curInterp = interp;
     } else if (curInterp === null) {
