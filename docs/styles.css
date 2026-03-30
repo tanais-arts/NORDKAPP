@@ -1,3 +1,10 @@
+/* Glow doré pour l'étiquette Nordkapp sur la timeline */
+.tl-escale-city-tick .tick-name.nordkapp-glow {
+  text-shadow:
+    0 0 8px #f0c060,
+    0 0 16px #f0c060,
+    0 0 24px #f0c060;
+}
 /* Ticks d'escale centrés (ajoutés dynamiquement) */
 .tl-escale-city-tick .tick-line {
   width: 3px;
@@ -11,7 +18,6 @@
   color: #f0c060;
   font-weight: bold;
   font-size: 0.65rem;
-  text-shadow: 0 0 2px #fff8;
   opacity: 1;
 }
 .tl-escale-cover {

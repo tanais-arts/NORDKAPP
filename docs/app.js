@@ -462,8 +462,9 @@ function buildTimelineCities(cities, totalEntries) {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
-  // Afficher les ticks classiques pour toutes les villes SAUF celles déjà présentes comme escale
+  // Track escale city names already rendered as ticks (normalized)
   let escaleCities = [];
+  let escaleTicked = new Set();
   if (window.escales && Array.isArray(window.escales)) {
     escaleCities = window.escales.map(e => (e.city || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''));
   }
@@ -471,6 +472,10 @@ function buildTimelineCities(cities, totalEntries) {
     // Ne pas afficher le tick classique si la ville est une escale (pour éviter doublon)
     const cname = (c.name || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
     if (escaleCities.includes(cname)) return;
+    // Exclure explicitement Honningsvåg si Nordkapp est une escale
+    if (cname.includes('honningsvag') && escaleCities.some(ec => ec.includes('nordkapp'))) return;
+    // Supprime explicitement Lødingen si déjà en escale (sécurité)
+    if (cname.includes('lodingen') && escaleCities.some(ec => ec.includes('lodingen'))) return;
     if (c.name === 'Malmö' && copenhagen) {
       const d = toMeters(c.lat, c.lon, copenhagen.lat, copenhagen.lon);
       if (d < 30000) return;
@@ -496,10 +501,13 @@ function buildTimelineCities(cities, totalEntries) {
     tlCitiesRow.appendChild(div);
   });
 
-  // Ajouter en plus les ticks centrés pour chaque escale (classe spéciale)
+  // Ajouter en plus les ticks centrés pour chaque escale (classe spéciale), but only once per city
   if (window.escales && Array.isArray(window.escales) && state.entryTimes && state.entryTimes.length > 1) {
     const span = state.entryTimeMax - state.entryTimeMin;
     window.escales.forEach(e => {
+      const escaleNameNorm = (e.city || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+      if (escaleTicked.has(escaleNameNorm)) return; // already rendered
+      escaleTicked.add(escaleNameNorm);
       function parseISOtoUTC(str) {
         const d = new Date(str + 'Z');
         d.setUTCHours(d.getUTCHours() - 2);
@@ -515,7 +523,9 @@ function buildTimelineCities(cities, totalEntries) {
       const div = document.createElement('div');
       div.className = 'tl-city-tick tl-escale-city-tick';
       div.style.left = `${pct}%`;
-      div.innerHTML = `<div class=\"tick-line\"></div><div class=\"tick-name\">${e.city}</div>`;
+      // Ajoute la classe glow si Nordkapp
+      const isNordkapp = escaleNameNorm.includes('nordkapp');
+      div.innerHTML = `<div class=\"tick-line\"></div><div class=\"tick-name${isNordkapp ? ' nordkapp-glow' : ''}\">${e.city}</div>`;
       tlCitiesRow.appendChild(div);
     });
   }
@@ -780,13 +790,90 @@ async function init() {
         bar.style.left = (pct0 * 100) + '%';
         bar.style.width = ((pct1 - pct0) * 100) + '%';
         bar.style.top = '50%';
-        bar.style.height = '6px'; // 3x thicker than base line (2px)
-        bar.style.marginTop = '-2px'; // align top edge with base line
-        bar.style.transform = 'translateY(-16%)'; // fine-tune centering on base line
+        bar.style.height = '6px';
+        bar.style.marginTop = '-2px';
+        bar.style.transform = 'translateY(-16%)';
         bar.style.background = 'rgba(240,192,96,1)';
         bar.style.borderRadius = '3px';
-        bar.style.zIndex = '2'; // above cover and base line
+        bar.style.zIndex = '2';
         bar.style.boxShadow = '0 0 2px 0px rgba(240,192,96,0.10)';
+        bar.style.cursor = 'pointer';
+        // Clique : va à l'entrée la plus proche du début de l'escale
+        bar.onclick = () => {
+          if (!entryTimes || entryTimes.length === 0) return;
+          // Cherche l'index de l'entrée média la plus proche APRÈS la fin de l'escale
+          let idx = 0;
+          let minDt = Infinity;
+          const tRef = t1; // t1 = fin de l'escale
+          if (typeof mediaEntries !== 'undefined' && mediaEntries.size > 0) {
+            for (const i of mediaEntries) {
+              if (i < 0 || i >= entryTimes.length) continue;
+              const dt = entryTimes[i] - tRef;
+              if (dt < 0) continue; // Ignore points in the past
+              if (dt < minDt) { minDt = dt; idx = i; }
+            }
+            // Fallback : si aucun point futur, prendre le plus proche dans le passé
+            if (minDt === Infinity) {
+              let bestPast = null;
+              let bestPastDt = Infinity;
+              for (const i of mediaEntries) {
+                if (i < 0 || i >= entryTimes.length) continue;
+                const dt = tRef - entryTimes[i];
+                if (dt < 0) continue;
+                if (dt < bestPastDt) { bestPastDt = dt; bestPast = i; }
+              }
+              if (bestPast !== null) idx = bestPast;
+            }
+          } else {
+            for (let i = 0; i < entryTimes.length; i++) {
+              const dt = entryTimes[i] - tRef;
+              if (dt < 0) continue;
+              if (dt < minDt) { minDt = dt; idx = i; }
+            }
+            if (minDt === Infinity) {
+              let bestPast = null;
+              let bestPastDt = Infinity;
+              for (let i = 0; i < entryTimes.length; i++) {
+                const dt = tRef - entryTimes[i];
+                if (dt < 0) continue;
+                if (dt < bestPastDt) { bestPastDt = dt; bestPast = i; }
+              }
+              if (bestPast !== null) idx = bestPast;
+            }
+          }
+          const tlInput = document.getElementById('timeline-input');
+          const thumbLabel = document.getElementById('timeline-thumb-label');
+          if (tlInput && typeof animateToTime === 'function') {
+            // Affiche le label date pendant l'animation (avec !important)
+            if (thumbLabel) {
+              thumbLabel.style.setProperty('opacity', '1', 'important');
+            }
+            const from = Number(tlInput.value);
+            const to = entryTimes[idx];
+            animateToTime(from, to, 2000,
+              (val) => {
+                const v = Math.round(val);
+                tlInput.value = v;
+                previewAtTime(v);
+                updateTimelineThumbForTime(v);
+              },
+              () => {
+                tlInput.value = to;
+                previewAtTime(to);
+                updateTimelineThumbForTime(to);
+                selectEntry(idx);
+                // Cache le label si le slider n'est pas hover/focus
+                setTimeout(() => {
+                  if (thumbLabel && !tlInput.matches(':hover') && document.activeElement !== tlInput) {
+                    thumbLabel.style.removeProperty('opacity');
+                  }
+                }, 400);
+              }
+            );
+          } else if (typeof selectEntry === 'function') {
+            selectEntry(idx);
+          }
+        };
         wrap.appendChild(bar);
       });
     }
@@ -1052,11 +1139,27 @@ async function init() {
   updateTimelineThumb(0);
   buildTimelineCities(visited, entries.length);
 
-  // Add explicit date markers for Lødingen (26/06 22:00) and Malmö (08/07 09:41)
+  // Add explicit date markers for Lødingen (26/06 22:00) and Malmö (08/07 09:41),
+  // but skip if already rendered as an escale tick
+  const escaleTickedForDateMarker = new Set();
   function addDateMarker(day, month, hour, minute, label) {
     if (!tlCitiesRow) return;
     const year = state.entries[0]?.year || 2024;
-    // convert CEST (UTC+2) entry time into ms UTC to match state.entryTimes
+    // Only show the city name (strip any appended date after ' · ')
+    const displayName = (label || '').split(' · ')[0];
+    // Normalize for comparison
+    const displayNameNorm = displayName.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
+    // If already rendered as an escale tick, skip
+    if (escaleTickedForDateMarker.has(displayNameNorm)) return;
+    // Also check if this city is in escales
+    if (window.escales && Array.isArray(window.escales)) {
+      const escaleCities = window.escales.map(e => (e.city || '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, ''));
+      if (escaleCities.includes(displayNameNorm)) {
+        escaleTickedForDateMarker.add(displayNameNorm);
+        return;
+      }
+    }
+    escaleTickedForDateMarker.add(displayNameNorm);
     const t = Date.UTC(year, month - 1, day, hour - 2, minute);
     const idx = timeToIndex(t);
     // compute pct position across timeline using entryTimes
@@ -1071,9 +1174,7 @@ async function init() {
     const div = document.createElement('div');
     div.className = 'tl-city-tick';
     div.style.left = `${pct}%`;
-    // Only show the city name (strip any appended date after ' · ')
-    const displayName = (label || '').split(' · ')[0];
-    div.innerHTML = `<div class="tick-line"></div><div class="tick-name">${displayName}</div>`;
+    div.innerHTML = `<div class=\"tick-line\"></div><div class=\"tick-name\">${displayName}</div>`;
     tlCitiesRow.appendChild(div);
   }
   // Lødingen: 26 June 22:00 (CEST)
@@ -1145,10 +1246,22 @@ async function init() {
         let best = null;
         let bestDt = Infinity;
         for (const i of mediaEntries) {
-          // ensure bounds safety
           if (i < 0 || i >= state.entryTimes.length) continue;
-          const dt = Math.abs(state.entryTimes[i] - t);
+          const dt = state.entryTimes[i] - t;
+          if (dt < 0) continue; // Ignore points in the past
           if (dt < bestDt) { bestDt = dt; best = i; }
+        }
+        // Si aucun point futur trouvé, fallback sur le plus proche dans le passé
+        if (best === null) {
+          let bestPast = null;
+          let bestPastDt = Infinity;
+          for (const i of mediaEntries) {
+            if (i < 0 || i >= state.entryTimes.length) continue;
+            const dt = t - state.entryTimes[i];
+            if (dt < 0) continue;
+            if (dt < bestPastDt) { bestPastDt = dt; bestPast = i; }
+          }
+          if (bestPast !== null) best = bestPast;
         }
         if (best !== null) idx = best;
       }
