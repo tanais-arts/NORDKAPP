@@ -1013,6 +1013,18 @@ async function init() {
   };
 
   const latlngs = entries.map(e => [e.lat, e.lon]);
+
+  // Calcul de distance haversine entre deux entrées (en km)
+  function gapKm(a, b) {
+    const R = 6371;
+    const lat1 = a.lat * Math.PI / 180, lon1 = a.lon * Math.PI / 180;
+    const lat2 = b.lat * Math.PI / 180, lon2 = b.lon * Math.PI / 180;
+    const dlat = lat2 - lat1, dlon = lon2 - lon1;
+    const h = Math.sin(dlat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dlon/2)**2;
+    return R * 2 * Math.asin(Math.sqrt(h));
+  }
+  const GAP_THRESHOLD_KM = 10; // coupe la trace si saut > 10 km
+
   let curSeg = [], curInterp = null;
   const flushSeg = (interp) => {
     if (curSeg.length < 2) return;
@@ -1028,8 +1040,14 @@ async function init() {
   };
   entries.forEach((e, i) => {
     const interp = e.frame === 0;
-    if (curInterp === null) curInterp = interp;
-    if (interp !== curInterp) {
+    // Couper la trace sur les trous GPS (saut > seuil)
+    if (i > 0 && gapKm(entries[i - 1], e) > GAP_THRESHOLD_KM) {
+      flushSeg(curInterp);
+      curSeg = [];
+      curInterp = interp;
+    } else if (curInterp === null) {
+      curInterp = interp;
+    } else if (interp !== curInterp) {
       const join = curSeg[curSeg.length - 1];
       flushSeg(curInterp);
       curSeg = [join];
