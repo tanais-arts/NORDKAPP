@@ -266,7 +266,7 @@ body.panel-open #panel { transform: translateX(0); }
   display: flex; align-items: baseline; gap: 5px;
   z-index: 401;
   pointer-events: none;
-  background: rgba(255,255,255,0.15);
+  background: rgba(6,18,34,0.97);
   backdrop-filter: blur(6px);
   border-radius: 6px;
   padding: 4px 10px;
