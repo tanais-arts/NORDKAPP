@@ -78,31 +78,15 @@
   background: var(--bg);
   align-items: center; justify-content: center;
 }
-#rotate-content { text-align: center; }
+#rotate-content { text-align: center; padding: 0 32px; }
 #rotate-icon {
-  font-size: 4rem; color: #f0c060;
+  font-size: 3rem;
   display: block; margin-bottom: 20px;
-  animation: rotate-hint 2s ease-in-out infinite;
 }
-@keyframes rotate-hint {
-  0%, 100% { transform: rotate(0deg); }
-  40%       { transform: rotate(90deg); }
-  60%       { transform: rotate(90deg); }
-}
-#rotate-msg { font-size: 1.3rem; font-weight: 600; color: var(--text1); margin-bottom: 8px; }
-#rotate-sub { font-size: 0.85rem; color: var(--text4); letter-spacing: 0.08em; }
+#rotate-msg { font-size: 1.4rem; font-weight: 600; color: rgba(240,192,96,1); letter-spacing: 0.05em; }
 
 @media (orientation: portrait) and (max-width: 1024px) {
-  /* Layout portrait utilisable : carte + timeline */
-  #rotate-overlay { display: none; }
-  #photo-bar, #title-bar, #panel, #mobile-toggle, #mobile-title-bar { display: none !important; }
-  #map {
-    top: 0 !important; left: 0 !important;
-    right: 0 !important; bottom: 100px !important;
-    width: 100% !important;
-  }
-  #bottom-bar { left: 0; right: 0; }
-  #timeline-bar { height: 100px; }
+  #rotate-overlay { display: flex; }
 }
 
 /* ── MOBILE LANDSCAPE ───────────────────────────────── */
