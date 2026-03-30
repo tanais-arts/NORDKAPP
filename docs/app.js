@@ -1296,8 +1296,21 @@ async function init() {
 
   // Carousel arrows
   const carouselEl = document.getElementById('photo-carousel');
-  document.getElementById('carousel-prev').addEventListener('click', () => carouselEl.scrollBy({ left: -4 * THUMB_STEP, behavior: 'smooth' }));
-  document.getElementById('carousel-next').addEventListener('click', () => carouselEl.scrollBy({ left:  4 * THUMB_STEP, behavior: 'smooth' }));
+  function selectEntryFromCarouselCenter() {
+    const scrollLeft = carouselEl.scrollLeft;
+    const centerX = scrollLeft + carouselEl.clientWidth / 2;
+    const photoIdx = Math.max(0, Math.min(state.photos.length - 1, Math.round((centerX - THUMB_STEP / 2) / THUMB_STEP)));
+    const p = state.photos[photoIdx];
+    if (p && p.entryIdx != null) selectEntry(p.entryIdx);
+  }
+  document.getElementById('carousel-prev').addEventListener('click', () => {
+    carouselEl.scrollBy({ left: -4 * THUMB_STEP, behavior: 'smooth' });
+    setTimeout(selectEntryFromCarouselCenter, 400);
+  });
+  document.getElementById('carousel-next').addEventListener('click', () => {
+    carouselEl.scrollBy({ left:  4 * THUMB_STEP, behavior: 'smooth' });
+    setTimeout(selectEntryFromCarouselCenter, 400);
+  });
 
   // Mode immersif
   const stage     = document.getElementById('video-stage');
