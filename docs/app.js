@@ -1136,7 +1136,18 @@ async function init() {
     tlInput.step = 1;
     tlInput.value = 0;
   }
-  updateTimelineThumb(0);
+  // Démarrage sur une entrée aléatoire avec vidéo
+  const videoEntryIndices = entries.map((e, i) => e.url ? i : -1).filter(i => i >= 0);
+  const randomIdx = videoEntryIndices.length > 0
+    ? videoEntryIndices[Math.floor(Math.random() * videoEntryIndices.length)]
+    : 0;
+  if (state.entryTimes && state.entryTimes.length > 1) {
+    tlInput.value = state.entryTimes[randomIdx];
+  } else {
+    tlInput.value = randomIdx;
+  }
+  updateTimelineThumb(randomIdx);
+  setTimeout(() => selectEntry(randomIdx), 0);
   buildTimelineCities(visited, entries.length);
 
   // Add explicit date markers for Lødingen (26/06 22:00) and Malmö (08/07 09:41),
