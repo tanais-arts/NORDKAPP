@@ -301,13 +301,24 @@ body.panel-open #panel { transform: translateX(0); }
 #rate-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: #f0c060; cursor: pointer; }
 #rate-slider::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: #f0c060; border: none; cursor: pointer; }
 
-#btn-immersive {
-  background: none; border: 1px solid rgba(240,192,96,0.5);
-  color: #f0c060; font-size: 1rem; cursor: pointer;
-  padding: 4px 8px; line-height: 1; border-radius: 3px;
-  transition: background 0.15s, border-color 0.15s;
+#video-toolbar {
+  justify-content: center;
 }
-#btn-immersive:hover { background: rgba(240,192,96,0.15); border-color: #f0c060; }
+#btn-immersive {
+  background: rgba(240,192,96,0.12);
+  border: 1px solid rgba(240,192,96,0.7);
+  color: #f0c060; font-size: 0.8rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; padding: 7px 18px; line-height: 1;
+  border-radius: 4px; width: 100%;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  box-shadow: 0 0 8px rgba(240,192,96,0.15);
+}
+#btn-immersive:hover {
+  background: rgba(240,192,96,0.22);
+  border-color: #f0c060;
+  box-shadow: 0 0 14px rgba(240,192,96,0.35);
+}
 
 /* Masquer le bouton plein écran natif de la vidéo */
 video::-webkit-media-controls-fullscreen-button { display: none; }
