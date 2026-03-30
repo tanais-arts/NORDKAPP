@@ -266,6 +266,10 @@ body.panel-open #panel { transform: translateX(0); }
   display: flex; align-items: baseline; gap: 5px;
   z-index: 401;
   pointer-events: none;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(6px);
+  border-radius: 6px;
+  padding: 4px 10px;
 }
 #date-day   { font-size: 1.1rem; font-weight: 700; color: var(--accT); transition: color 1.4s ease; }
 #date-month { font-size: 1.1rem; font-weight: 300; color: var(--text2); text-transform: lowercase; transition: color 1.4s ease; }
