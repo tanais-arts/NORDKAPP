@@ -271,10 +271,10 @@ body.panel-open #panel { transform: translateX(0); }
   border-radius: 6px;
   padding: 4px 10px;
 }
-#date-day   { font-size: 1.1rem; font-weight: 700; color: var(--accT); transition: color 1.4s ease; }
-#date-month { font-size: 1.1rem; font-weight: 300; color: var(--accT); text-transform: lowercase; transition: color 1.4s ease; }
-#date-year  { font-size: 1.1rem; font-weight: 300; color: var(--accT); margin-right: 8px; transition: color 1.4s ease; }
-#date-time  { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.1em; color: var(--accT); transition: color 1.4s ease; }
+#date-day   { font-size: 1.1rem; font-weight: 700; color: rgba(240,192,96,1); transition: color 1.4s ease; }
+#date-month { font-size: 1.1rem; font-weight: 300; color: rgba(240,192,96,1); text-transform: lowercase; transition: color 1.4s ease; }
+#date-year  { font-size: 1.1rem; font-weight: 300; color: rgba(240,192,96,1); margin-right: 8px; transition: color 1.4s ease; }
+#date-time  { font-size: 1.1rem; font-weight: 300; letter-spacing: 0.1em; color: rgba(240,192,96,1); transition: color 1.4s ease; }
 
 /* video */
 #video-wrap { background: #000; position: relative; cursor: pointer; }
