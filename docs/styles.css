@@ -256,18 +256,8 @@ html, body {
 body.panel-open #panel { transform: translateX(0); }
 
 #panel-close {
-  display: flex; justify-content: flex-end;
-  background: none; border: none; width: 100%;
-  padding: 6px 10px 4px;
-  flex-shrink: 0;
+  display: none;
 }
-#panel-close::after {
-  content: '✕';
-  color: var(--text4); font-size: 1rem; line-height: 1;
-  cursor: pointer; padding: 4px 6px;
-  transition: color 0.15s;
-}
-#panel-close:hover::after { color: var(--text1); }
 
 #panel-date {
   padding: 14px 24px;
