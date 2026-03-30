@@ -293,7 +293,11 @@ function scrollCarouselTo(pi) {
   if (next) {
     next.classList.add('active');
     next.fetchPriority = 'high';
-    if (next.dataset.src) { next.src = next.dataset.src; delete next.dataset.src; }
+    // Charger immédiatement si pas encore chargé
+    if (next.dataset.src && !next.src) { 
+      next.src = next.dataset.src; 
+      delete next.dataset.src; 
+    }
   }
   state.activePhotoIdx = pi;
 }
@@ -343,6 +347,9 @@ function updatePanel(e, idx) {
     player.playbackRate = currentRate();
     player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
   };
+  player.onerror = (err) => {
+    console.error('Erreur de chargement vidéo:', e.url, err);
+  };
   player.onended = () => {
     const next = state.activeIdx + 1;
     if (next < entries.length) selectEntry(next);
@@ -384,10 +391,21 @@ async function init() {
   const fragment = document.createDocumentFragment();
   photos.forEach((p, i) => {
     const img = document.createElement('img');
-    img.dataset.src = p.thumb || p.src;
+    // Charger immédiatement les 10 premières images, lazy-load le reste
+    if (i < 10) {
+      img.src = p.thumb || p.src;
+    } else {
+      img.dataset.src = p.thumb || p.src;
+    }
     img.className = 'photo-thumb';
     img.draggable = false;
     img.addEventListener('click', () => openLightbox(photos, i));
+    // Gestion des erreurs de chargement : fallback vers src si thumb échoue
+    img.onerror = () => {
+      if (img.src.includes('/Thumbs/') && p.src) {
+        img.src = p.src;
+      }
+    };
     fragment.appendChild(img);
   });
   carousel.appendChild(fragment);
