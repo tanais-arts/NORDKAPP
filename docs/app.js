@@ -201,7 +201,6 @@ const hillshade = L.tileLayer(
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const player       = document.getElementById('player');
-const preloader    = document.getElementById('preloader');
 const dateDay      = document.getElementById('date-day');
 const dateMonth    = document.getElementById('date-month');
 const dateTime     = document.getElementById('date-time');
@@ -231,7 +230,7 @@ function syncAllSoundBtns() {
 
 function setSoundOn(val) {
   soundOn = val;
-  player.muted = !soundOn;
+  // Les vidéos n'ont pas de son — le bouton contrôle uniquement l'ambiance.
   if (window._ambienceSetMuted) window._ambienceSetMuted(!soundOn);
   syncAllSoundBtns();
 }
@@ -239,6 +238,37 @@ function setSoundOn(val) {
 // Bouton son principal — toujours visible sur la carte
 document.getElementById('sound-toggle').addEventListener('click', () => setSoundOn(!soundOn));
 syncAllSoundBtns(); // état initial = muet
+
+// ── Video blob prefetch ─────────────────────────────────────────────
+// Télécharge la vidéo suivante entièrement en mémoire (blob URL).
+// Garanti zéro latence réseau lors de la transition, indépendamment
+// des headers Cache-Control du CDN.
+let _prefetchCtrl = null;
+const _blobCache   = new Map(); // url originale → blob URL
+
+async function prefetchVideo(url) {
+  if (_blobCache.has(url)) return;
+  if (_prefetchCtrl) { _prefetchCtrl.abort(); }
+  _prefetchCtrl = new AbortController();
+  try {
+    const resp = await fetch(url, { signal: _prefetchCtrl.signal });
+    if (!resp.ok) return;
+    const blob = await resp.blob();
+    _blobCache.set(url, URL.createObjectURL(blob));
+  } catch(e) {
+    if (e.name !== 'AbortError') console.warn('[prefetch] failed:', e.message);
+  }
+}
+
+function resolvePrefetch(url) {
+  return _blobCache.get(url) ?? url;
+}
+
+function evictOldBlobs(keepA, keepB) {
+  for (const [k, v] of _blobCache) {
+    if (k !== keepA && k !== keepB) { URL.revokeObjectURL(v); _blobCache.delete(k); }
+  }
+}
 
 // ── Spinner vidéo — branché une seule fois ────────────────────────────
 {
@@ -254,18 +284,17 @@ syncAllSoundBtns(); // état initial = muet
     videoWrap.classList.remove('is-loading');
     stageEl.classList.remove('is-loading');
     player.playbackRate = currentRate();
-    // Précharger la vidéo SUIVANTE uniquement après que la courante a démarré,
-    // pour ne pas diviser la bande passante pendant le chargement initial.
+    // Précharger la vidéo SUIVANTE en mémoire (blob) — zéro latence réseau
+    // à la transition, même si le CDN envoie des headers no-cache.
     if (state.activeIdx != null) {
       const entries = state.entries;
       let nextE = null;
       for (let i = state.activeIdx + 1; i < entries.length; i++) {
         if (entries[i].url) { nextE = entries[i]; break; }
       }
-      if (nextE && preloader.dataset.loadedUrl !== nextE.url) {
-        preloader.dataset.loadedUrl = nextE.url;
-        preloader.src = nextE.url;
-        preloader.load();
+      if (nextE) {
+        const currentUrl = entries[state.activeIdx]?.url;
+        prefetchVideo(nextE.url).then(() => evictOldBlobs(currentUrl, nextE.url));
       }
     }
   });
@@ -280,10 +309,10 @@ syncAllSoundBtns(); // état initial = muet
 // ── Ambiance sonore ──────────────────────────────────────────────────
 {
   const TRACKS = [
-    'sounds/Goelands.mp3',
-    'sounds/Mosjoen.mp3',
-    'sounds/Nordkapp%201.mp3',
-    'sounds/Nordkapp%202.mp3',
+    'https://filedn.com/lkWW0YSMhAbFD13RbGDalo0/sounds/Goelands.mp3',
+    'https://filedn.com/lkWW0YSMhAbFD13RbGDalo0/sounds/Mosjoen.mp3',
+    'https://filedn.com/lkWW0YSMhAbFD13RbGDalo0/sounds/Nordkapp%201.mp3',
+    'https://filedn.com/lkWW0YSMhAbFD13RbGDalo0/sounds/Nordkapp%202.mp3',
   ];
   const FADE_MS  = 2000;   // durée fondu (ms)
   const SWAP_MS  = 60000;  // intervalle entre crossfades (ms)
@@ -315,27 +344,41 @@ syncAllSoundBtns(); // état initial = muet
     requestAnimationFrame(step);
   }
 
+  // Charge et joue un élément audio dès qu'il est prêt (évite le play avant canplay)
+  function loadAndPlay(el, vol, onPlaying) {
+    el.volume = vol;
+    const onCanPlay = () => {
+      el.removeEventListener('canplay', onCanPlay);
+      const p = el.play();
+      if (p && p.catch) p.catch(() => {});
+      if (onPlaying) onPlaying();
+    };
+    el.addEventListener('canplay', onCanPlay);
+    el.load();
+  }
+
   function crossfade() {
-    next.src = pickRandom();
-    next.volume = 0;
-    next.play().catch(() => {});
-    fadeTo(next, 1, FADE_MS);
-    fadeTo(current, 0, FADE_MS, () => {
-      current.pause();
-      current.removeAttribute('src');
-      current.load();
+    // Capturer les références AVANT le swap — les closures de fadeTo
+    // capturent par référence, le swap les invaliderait sinon.
+    const outEl = current;
+    const inEl  = next;
+    inEl.src = pickRandom();
+    loadAndPlay(inEl, 0, () => fadeTo(inEl, 1, FADE_MS));
+    fadeTo(outEl, 0, FADE_MS, () => {
+      outEl.pause();
+      outEl.removeAttribute('src');
     });
-    [current, next] = [next, current];
+    current = inEl;
+    next    = outEl;
     swapTimer = setTimeout(crossfade, SWAP_MS);
   }
 
   function startAmbience() {
     if (ambStarted) return;
     ambStarted = true;
-    current.src = pickRandom();
-    current.volume = 0;
-    current.play().catch(() => {});
-    fadeTo(current, 1, FADE_MS);
+    const startEl = current; // capturer avant tout
+    startEl.src = pickRandom();
+    loadAndPlay(startEl, 0, () => fadeTo(startEl, 1, FADE_MS));
     swapTimer = setTimeout(crossfade, SWAP_MS);
   }
 
@@ -343,15 +386,14 @@ syncAllSoundBtns(); // état initial = muet
   // setSoundOn(false) la coupe. Contrôlée par le bouton #sound-toggle.
   window._ambienceSetMuted = (muted) => {
     if (!muted) {
-      // Activer → démarrer si jamais lancé, sinon reprendre
       if (!ambStarted) { startAmbience(); return; }
       if (current.paused) {
-        current.play().catch(() => {});
+        const p = current.play();
+        if (p && p.catch) p.catch(() => {});
         fadeTo(current, 1, FADE_MS);
       }
       if (!swapTimer) swapTimer = setTimeout(crossfade, SWAP_MS);
     } else {
-      // Couper → fondu et pause
       clearTimeout(swapTimer);
       swapTimer = null;
       fadeTo(current, 0, 500, () => { current.pause(); });
@@ -792,11 +834,6 @@ function updatePanel(e, idx) {
 
   // Utiliser dataset.loadedUrl pour comparer les URLs relatives (player.src retourne l'URL absolue)
   if (player.dataset.loadedUrl !== e.url) {
-    // Arrêter le preloader immédiatement pour lui libérer la bande passante
-    preloader.removeAttribute('src');
-    preloader.load();
-    delete preloader.dataset.loadedUrl;
-
     player.dataset.loadedUrl = e.url;
     const videoWrap = document.getElementById('video-wrap');
     const stageEl   = document.getElementById('video-stage');
@@ -806,10 +843,7 @@ function updatePanel(e, idx) {
       const next = state.activeIdx + 1;
       if (next < entries.length) selectEntry(next);
     };
-    player.src = e.url;
-    player.load();
-    // Respecte le choix son de l'utilisateur. Si le navigateur bloque l'autoplay
-    // avec son, on joue en muet SANS changer soundOn (le bouton reste en état voulu).
+    player.src = resolvePrefetch(e.url);
     player.muted = !soundOn;
     player.play().catch(() => {
       player.muted = true;
