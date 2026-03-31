@@ -942,7 +942,6 @@ async function init() {
       fixedTermOp = 0.7;
       // Force the terminator to use this opacity immediately
       if (terminator) terminator.setStyle({ fillOpacity: fixedTermOp, fillColor: '#000412' });
-      console.info('Fixed terminator opacity overridden to:', fixedTermOp);
     }
   } catch (err) {
     console.warn('Could not compute fixed terminator opacity for June 21', err);
