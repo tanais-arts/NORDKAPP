@@ -535,6 +535,26 @@ body.immersive .leaflet-control-attribution { display: none; }
   text-transform: uppercase; flex-shrink: 0;
   transition: color 1.4s ease;
 }
+#tl-prev, #tl-next {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  background: rgba(240,192,96,0.12);
+  border: 1px solid rgba(240,192,96,0.3);
+  border-radius: 50%;
+  color: #f0c060;
+  font-size: 1.4rem; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  padding: 0;
+}
+#tl-prev:hover, #tl-next:hover {
+  background: rgba(240,192,96,0.28);
+  border-color: rgba(240,192,96,0.7);
+}
+#tl-prev:active, #tl-next:active {
+  background: rgba(240,192,96,0.45);
+}
 #timeline-wrap { flex: 1; position: relative; display: flex; flex-direction: column; gap: 2px; }
 
 #timeline-cities-row { position: relative; height: 64px; width: 100%; }

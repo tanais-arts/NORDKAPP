@@ -1510,6 +1510,22 @@ async function init() {
   });
   if (isMobileLandscape()) enterMobileLandscape();
 
+  // Boutons prev/next timeline
+  function navPrevVideo() {
+    if (state.activeIdx === null) return;
+    for (let i = state.activeIdx - 1; i >= 0; i--) {
+      if (state.entries[i].url) { selectEntry(i); return; }
+    }
+  }
+  function navNextVideo() {
+    if (state.activeIdx === null) return;
+    for (let i = state.activeIdx + 1; i < state.entries.length; i++) {
+      if (state.entries[i].url) { selectEntry(i); return; }
+    }
+  }
+  document.getElementById('tl-prev').addEventListener('click', navPrevVideo);
+  document.getElementById('tl-next').addEventListener('click', navNextVideo);
+
   // Keyboard
   document.addEventListener('keydown', ev => {
     if (!lightbox.hidden) {
