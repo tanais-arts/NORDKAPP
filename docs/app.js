@@ -765,10 +765,10 @@ function previewAtTime(t) {
   updateTimelineThumbForTime(t);
 }
 
-function scrollCarouselTo(pi) {
+function scrollCarouselTo(pi, smooth = false) {
   if (pi === state.activePhotoIdx) return;
   const carousel = document.getElementById('photo-carousel');
-  carousel.scrollTo({ left: pi * THUMB_STEP + THUMB_STEP / 2, behavior: 'smooth' });
+  carousel.scrollTo({ left: pi * THUMB_STEP + THUMB_STEP / 2, behavior: smooth ? 'smooth' : 'instant' });
   const prev = state.thumbEls[state.activePhotoIdx];
   if (prev) { prev.classList.remove('active'); prev.fetchPriority = 'low'; }
   const next = state.thumbEls[pi];
