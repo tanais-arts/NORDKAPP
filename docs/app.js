@@ -1527,12 +1527,25 @@ async function init() {
 
   // Carousel arrows — défilement continu 1 photo/300ms au maintien du bouton
   const carouselEl = document.getElementById('photo-carousel');
-  function selectEntryFromCarouselCenter() {
+  // Navigation carousel → met à jour carte + ring + date, sans toucher à la vidéo
+  function previewEntryFromCarouselCenter() {
     const scrollLeft = carouselEl.scrollLeft;
     const centerX = scrollLeft + carouselEl.clientWidth / 2;
     const photoIdx = Math.max(0, Math.min(state.photos.length - 1, Math.round((centerX - THUMB_STEP / 2) / THUMB_STEP)));
     const p = state.photos[photoIdx];
-    if (p && p.entryIdx != null) selectEntry(p.entryIdx);
+    if (!p || p.entryIdx == null) return;
+    const idx = p.entryIdx;
+    const e = state.entries[idx];
+    if (!e) return;
+    showRing([e.lat, e.lon]);
+    applyDaylight(sunElevationDeg(e.lat, e.lon, e.day, e.month, e.hour, e.minute));
+    scheduleTerminatorUpdate(new Date(Date.UTC(2024, e.month - 1, e.day, e.hour - 2, e.minute)));
+    if (!map.getBounds().contains([e.lat, e.lon])) {
+      map.panTo([e.lat, e.lon], { animate: true, duration: 0.4 });
+    }
+    dateDay.textContent   = e.day;
+    dateMonth.textContent = MONTHS_FR[e.month];
+    dateTime.textContent  = `${e.hour}h${String(e.minute).padStart(2, '0')}`;
   }
 
   function attachCarouselArrow(btnId, dir) {
@@ -1540,6 +1553,7 @@ async function init() {
     let intervalId = null;
     function step() {
       carouselEl.scrollBy({ left: dir * THUMB_STEP, behavior: 'smooth' });
+      previewEntryFromCarouselCenter();
     }
     function start() {
       step();
