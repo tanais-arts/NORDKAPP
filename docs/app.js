@@ -712,6 +712,11 @@ function updatePanel(e, idx) {
 
   // Utiliser dataset.loadedUrl pour comparer les URLs relatives (player.src retourne l'URL absolue)
   if (player.dataset.loadedUrl !== e.url) {
+    // Arrêter le preloader immédiatement pour lui libérer la bande passante
+    preloader.removeAttribute('src');
+    preloader.load();
+    delete preloader.dataset.loadedUrl;
+
     player.dataset.loadedUrl = e.url;
     const videoWrap = document.getElementById('video-wrap');
     videoWrap.classList.add('is-loading');
