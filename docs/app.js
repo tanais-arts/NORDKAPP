@@ -824,6 +824,7 @@ function selectEntry(idx) {
   // Date UTC du moment (voyage en CEST = UTC+2)
   scheduleTerminatorUpdate(new Date(Date.UTC(2024, e.month - 1, e.day, e.hour - 2, e.minute)));
   applyDaylight(sunElevationDeg(e.lat, e.lon, e.day, e.month, e.hour, e.minute));
+  scrollCarouselTo(nearestPhotoIdx(idx), true);
   if (!map.getBounds().contains([e.lat, e.lon])) {
     map.panTo([e.lat, e.lon], { animate: true, duration: 0.4 });
   }
