@@ -200,7 +200,8 @@ const hillshade = L.tileLayer(
 ).addTo(map);
 
 // ── DOM refs ─────────────────────────────────────────────────────────
-const player       = document.getElementById('player');
+let player  = document.getElementById('player');
+let playerB = document.getElementById('player-b');
 const dateDay      = document.getElementById('date-day');
 const dateMonth    = document.getElementById('date-month');
 const dateTime     = document.getElementById('date-time');
@@ -270,40 +271,68 @@ function evictOldBlobs(keepA, keepB) {
   }
 }
 
-// ── Spinner vidéo — branché une seule fois ────────────────────────────
+// Pré-décode la vidéo suivante dans le tampon standby (playerB).
+// Après canplaythrough, la transition se fait par swap instantané (zéro frame noire).
+async function prefetchAndPreload(url) {
+  await prefetchVideo(url);
+  if (playerB.dataset.loadedUrl === url) return; // déjà en cours
+  playerB.dataset.loadedUrl = url;
+  playerB._readyUrl = null;
+  playerB.src = resolvePrefetch(url);
+  playerB.muted = true;
+  playerB.load();
+  playerB.addEventListener('canplaythrough', () => {
+    if (playerB.dataset.loadedUrl === url) playerB._readyUrl = url;
+  }, { once: true });
+}
+
+// Swap actif ↔ standby — aucune frame noire si playerB est prêt
+function swapPlayers() {
+  playerB.style.opacity = '1';
+  player.style.opacity = '0';
+  [player, playerB] = [playerB, player];
+  playerB.pause();
+}
+
+// ── Spinner vidéo + preload — branché sur les deux éléments ─────────────
 {
   const videoWrap = document.getElementById('video-wrap');
   const stageEl   = document.getElementById('video-stage');
-  // Montre le spinner quand le browser est en train de tamponner
-  player.addEventListener('waiting', () => {
-    videoWrap.classList.add('is-loading');
-    stageEl.classList.add('is-loading');
-  });
-  // Cache le spinner dès que la vidéo joue effectivement
-  player.addEventListener('playing', () => {
-    videoWrap.classList.remove('is-loading');
-    stageEl.classList.remove('is-loading');
-    player.playbackRate = currentRate();
-    // Précharger la vidéo SUIVANTE en mémoire (blob) — zéro latence réseau
-    // à la transition, même si le CDN envoie des headers no-cache.
-    if (state.activeIdx != null) {
-      const entries = state.entries;
-      let nextE = null;
-      for (let i = state.activeIdx + 1; i < entries.length; i++) {
-        if (entries[i].url) { nextE = entries[i]; break; }
+
+  function attachVideoHandlers(el) {
+    el.addEventListener('waiting', () => {
+      if (el !== player) return;
+      videoWrap.classList.add('is-loading');
+      stageEl.classList.add('is-loading');
+    });
+    el.addEventListener('playing', () => {
+      if (el !== player) return;
+      videoWrap.classList.remove('is-loading');
+      stageEl.classList.remove('is-loading');
+      player.playbackRate = currentRate();
+      // Pré-décoder la vidéo suivante dans playerB
+      if (state.activeIdx != null) {
+        const entries = state.entries;
+        let nextE = null;
+        for (let i = state.activeIdx + 1; i < entries.length; i++) {
+          if (entries[i].url) { nextE = entries[i]; break; }
+        }
+        if (nextE) {
+          const currentUrl = entries[state.activeIdx]?.url;
+          prefetchAndPreload(nextE.url).then(() => evictOldBlobs(currentUrl, nextE.url));
+        }
       }
-      if (nextE) {
-        const currentUrl = entries[state.activeIdx]?.url;
-        prefetchVideo(nextE.url).then(() => evictOldBlobs(currentUrl, nextE.url));
-      }
-    }
-  });
-  // Cache aussi sur erreur pour éviter un spinner infini
-  player.addEventListener('error', () => {
-    videoWrap.classList.remove('is-loading');
-    stageEl.classList.remove('is-loading');
-    console.error('Erreur vidéo:', player.src);
-  });
+    });
+    el.addEventListener('error', () => {
+      if (el !== player) return;
+      videoWrap.classList.remove('is-loading');
+      stageEl.classList.remove('is-loading');
+      console.error('Erreur vidéo:', el.src);
+    });
+  }
+
+  attachVideoHandlers(player);
+  attachVideoHandlers(playerB);
 }
 
 // ── Ambiance sonore ──────────────────────────────────────────────────
@@ -832,31 +861,36 @@ function updatePanel(e, idx) {
   dateTime.textContent  = `${e.hour}h${String(e.minute).padStart(2, '0')}`;
 
   // Utiliser dataset.loadedUrl pour comparer les URLs relatives (player.src retourne l'URL absolue)
+  player.onended = () => {
+    const next = state.activeIdx + 1;
+    if (next < entries.length) selectEntry(next);
+  };
+
   if (player.dataset.loadedUrl !== e.url) {
     player.dataset.loadedUrl = e.url;
-    const videoWrap = document.getElementById('video-wrap');
-    const stageEl   = document.getElementById('video-stage');
-    videoWrap.classList.add('is-loading');
-    stageEl.classList.add('is-loading');
-    player.onended = () => {
-      const next = state.activeIdx + 1;
-      if (next < entries.length) selectEntry(next);
-    };
-    player.src = resolvePrefetch(e.url);
-    player.muted = !soundOn;
-    player.play().catch(() => {
-      player.muted = true;
-      player.play().catch(() => {});
-    });
-  } else {
-    // Même vidéo — juste s'assurer que le handler ended est à jour
-    player.onended = () => {
-      const next = state.activeIdx + 1;
-      if (next < entries.length) selectEntry(next);
-    };
+
+    if (playerB._readyUrl === e.url) {
+      // ✦ Transition seamless : playerB a déjà décodé cette vidéo
+      swapPlayers();
+      player.dataset.loadedUrl = e.url;
+      player.onended = () => {
+        const next = state.activeIdx + 1;
+        if (next < entries.length) selectEntry(next);
+      };
+      player.muted = !soundOn;
+      player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
+    } else {
+      // Fallback : chargement direct (premier clip ou navigation rapide)
+      const videoWrap = document.getElementById('video-wrap');
+      const stageEl   = document.getElementById('video-stage');
+      videoWrap.classList.add('is-loading');
+      stageEl.classList.add('is-loading');
+      player.src = resolvePrefetch(e.url);
+      player.muted = !soundOn;
+      player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
+    }
   }
-  // Le préchargement de la vidéo suivante est déclenché par l'event 'playing'
-  // (voir le bloc spinner au-dessus) pour ne pas concurrencer le download courant.
+  // Le pré-décodage de la vidéo suivante est déclenché par 'playing' (voir bloc spinner).
 
 }
 
@@ -1535,6 +1569,7 @@ async function init() {
     const mapEl = document.getElementById('map');
     if (stage) {
       stage.appendChild(player);
+      stage.appendChild(playerB);
       stage.appendChild(mapEl);
     }
     document.body.classList.add('immersive');
@@ -1554,6 +1589,7 @@ async function init() {
     const mapEl = document.getElementById('map');
     const photoBar = document.getElementById('photo-bar');
     videoWrap.insertBefore(player, toolbar);
+    videoWrap.insertBefore(playerB, toolbar);
     document.body.insertBefore(mapEl, photoBar);
     document.body.classList.remove('immersive');
     map.setMaxBounds(null);
@@ -1564,17 +1600,17 @@ async function init() {
   document.getElementById('btn-immersive').addEventListener('click', enterImmersive);
   document.getElementById('btn-exit-immersive').addEventListener('click', exitImmersive);
 
-  // Clic directement sur la vidéo = pause / play (pas sur la carte)
-  // stopPropagation pour éviter que ça bulle vers d'autres listeners
-  player.addEventListener('click', (ev) => {
+  // Clic directement sur la vidéo = pause / play — sur les deux éléments
+  function handleVideoClick(ev) {
     if (!document.body.classList.contains('immersive')) return;
     ev.stopPropagation();
-    if (player.paused) {
-      player.play().catch(() => {});
-    } else {
-      player.pause();
-    }
-  });
+    if (player.paused) player.play().catch(() => {});
+    else player.pause();
+  }
+  const _playerAInit = document.getElementById('player');
+  const _playerBInit = document.getElementById('player-b');
+  _playerAInit.addEventListener('click', handleVideoClick);
+  _playerBInit.addEventListener('click', handleVideoClick);
 
   // Bouton son dans le stage — délègue à setSoundOn (même logique que #sound-toggle)
   const stageMuteBtn = document.getElementById('stage-mute-btn');
