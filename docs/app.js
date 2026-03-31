@@ -258,6 +258,20 @@ const lbImg        = document.getElementById('lightbox-img');
   player.addEventListener('playing', () => {
     videoWrap.classList.remove('is-loading');
     player.playbackRate = currentRate();
+    // Précharger la vidéo SUIVANTE uniquement après que la courante a démarré,
+    // pour ne pas diviser la bande passante pendant le chargement initial.
+    if (state.activeIdx != null) {
+      const entries = state.entries;
+      let nextE = null;
+      for (let i = state.activeIdx + 1; i < entries.length; i++) {
+        if (entries[i].url) { nextE = entries[i]; break; }
+      }
+      if (nextE && preloader.dataset.loadedUrl !== nextE.url) {
+        preloader.dataset.loadedUrl = nextE.url;
+        preloader.src = nextE.url;
+        preloader.load();
+      }
+    }
   });
   // Cache aussi sur erreur pour éviter un spinner infini
   player.addEventListener('error', () => {
@@ -715,13 +729,8 @@ function updatePanel(e, idx) {
       if (next < entries.length) selectEntry(next);
     };
   }
-  // Précharger la vidéo suivante
-  const nextE = state.entries[idx + 1];
-  if (nextE && preloader.dataset.loadedUrl !== nextE.url) {
-    preloader.dataset.loadedUrl = nextE.url;
-    preloader.src = nextE.url;
-    preloader.load();
-  }
+  // Le préchargement de la vidéo suivante est déclenché par l'event 'playing'
+  // (voir le bloc spinner au-dessus) pour ne pas concurrencer le download courant.
 
 }
 
