@@ -679,27 +679,41 @@ function updatePanel(e, idx) {
   dateMonth.textContent = MONTHS_FR[e.month];
   dateTime.textContent  = `${e.hour}h${String(e.minute).padStart(2, '0')}`;
 
-  if (player.src !== e.url) {
+  // Utiliser dataset.loadedUrl pour comparer les URLs relatives (player.src retourne l'URL absolue)
+  if (player.dataset.loadedUrl !== e.url) {
+    player.dataset.loadedUrl = e.url;
+    const videoWrap = document.getElementById('video-wrap');
+    videoWrap.classList.add('is-loading');
+    // Assigner les handlers AVANT player.load() pour éviter la race condition
+    player.oncanplay = () => {
+      videoWrap.classList.remove('is-loading');
+      player.playbackRate = currentRate();
+      player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
+    };
+    player.onerror = () => {
+      videoWrap.classList.remove('is-loading');
+      console.error('Erreur de chargement vidéo:', e.url);
+    };
+    player.onended = () => {
+      const next = state.activeIdx + 1;
+      if (next < entries.length) selectEntry(next);
+    };
     player.src = e.url;
     player.load();
+  } else {
+    // Même vidéo — juste s'assurer que les handlers ended/rate sont à jour
+    player.onended = () => {
+      const next = state.activeIdx + 1;
+      if (next < entries.length) selectEntry(next);
+    };
   }
   // Précharger la vidéo suivante
   const nextE = state.entries[idx + 1];
-  if (nextE && preloader.src !== nextE.url) {
+  if (nextE && preloader.dataset.loadedUrl !== nextE.url) {
+    preloader.dataset.loadedUrl = nextE.url;
     preloader.src = nextE.url;
     preloader.load();
   }
-  player.oncanplay = () => {
-    player.playbackRate = currentRate();
-    player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
-  };
-  player.onerror = (err) => {
-    console.error('Erreur de chargement vidéo:', e.url, err);
-  };
-  player.onended = () => {
-    const next = state.activeIdx + 1;
-    if (next < entries.length) selectEntry(next);
-  };
 
 }
 

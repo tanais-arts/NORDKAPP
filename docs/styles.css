@@ -306,6 +306,20 @@ body.panel-open #panel { transform: translateX(0); }
 
 /* video */
 #video-wrap { background: #000; position: relative; cursor: pointer; }
+#video-loading-overlay {
+  position: absolute; inset: 0; z-index: 2;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.55); pointer-events: none;
+}
+#video-wrap.is-loading #video-loading-overlay { display: flex; }
+.video-spinner {
+  width: 38px; height: 38px;
+  border: 3px solid rgba(240,192,96,0.25);
+  border-top-color: #f0c060;
+  border-radius: 50%;
+  animation: vspin 0.75s linear infinite;
+}
+@keyframes vspin { to { transform: rotate(360deg); } }
 #video-wrap::after {
   content: '⤢  MODE IMMERSIF';
   position: absolute; inset: 0;
