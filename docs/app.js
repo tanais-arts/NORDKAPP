@@ -134,7 +134,7 @@ function scheduleTerminatorUpdate(date) {
   });
 }
 
-L.control.zoom({ position: 'bottomright' }).addTo(map);
+L.control.zoom({ position: 'bottomleft' }).addTo(map);
 
 // Create dedicated panes: labels above everything, shade above tiles
 map.createPane('shadePane');
@@ -211,14 +211,48 @@ const tlCitiesRow  = document.getElementById('timeline-cities-row');
 const lightbox     = document.getElementById('lightbox');
 const lbImg        = document.getElementById('lightbox-img');
 
+// ── Son persistant ───────────────────────────────────────────────────
+// Commence muet (politique autoplay). Le bouton #sound-toggle
+// est l'unique source de vérité — indépendant des chargements vidéo.
+let soundOn = false;
+
+const _SVG_SOUND_ON  = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15" fill="currentColor" aria-hidden="true"><path d="M2 5H.5v5H2l4 2.5V2.5L2 5z"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M9 4.5a3.5 3.5 0 0 1 0 6"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M11.5 2.5a6 6 0 0 1 0 10"/></svg>';
+const _SVG_SOUND_OFF = '<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 15 15" fill="currentColor" aria-hidden="true"><path d="M2 5H.5v5H2l4 2.5V2.5L2 5z"/><path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M10 5.5l4 4m0-4-4 4"/></svg>';
+
+function syncAllSoundBtns() {
+  ['sound-toggle', 'stage-mute-btn'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.innerHTML = soundOn ? _SVG_SOUND_ON : _SVG_SOUND_OFF;
+    btn.title = soundOn ? 'Couper le son' : 'Activer le son';
+    btn.classList.toggle('is-muted', !soundOn);
+  });
+}
+
+function setSoundOn(val) {
+  soundOn = val;
+  player.muted = !soundOn;
+  if (window._ambienceSetMuted) window._ambienceSetMuted(!soundOn);
+  syncAllSoundBtns();
+}
+
+// Bouton son principal — toujours visible sur la carte
+document.getElementById('sound-toggle').addEventListener('click', () => setSoundOn(!soundOn));
+syncAllSoundBtns(); // état initial = muet
+
 // ── Spinner vidéo — branché une seule fois ────────────────────────────
 {
   const videoWrap = document.getElementById('video-wrap');
+  const stageEl   = document.getElementById('video-stage');
   // Montre le spinner quand le browser est en train de tamponner
-  player.addEventListener('waiting', () => videoWrap.classList.add('is-loading'));
+  player.addEventListener('waiting', () => {
+    videoWrap.classList.add('is-loading');
+    stageEl.classList.add('is-loading');
+  });
   // Cache le spinner dès que la vidéo joue effectivement
   player.addEventListener('playing', () => {
     videoWrap.classList.remove('is-loading');
+    stageEl.classList.remove('is-loading');
     player.playbackRate = currentRate();
     // Précharger la vidéo SUIVANTE uniquement après que la courante a démarré,
     // pour ne pas diviser la bande passante pendant le chargement initial.
@@ -238,6 +272,7 @@ const lbImg        = document.getElementById('lightbox-img');
   // Cache aussi sur erreur pour éviter un spinner infini
   player.addEventListener('error', () => {
     videoWrap.classList.remove('is-loading');
+    stageEl.classList.remove('is-loading');
     console.error('Erreur vidéo:', player.src);
   });
 }
@@ -304,10 +339,25 @@ const lbImg        = document.getElementById('lightbox-img');
     swapTimer = setTimeout(crossfade, SWAP_MS);
   }
 
-  // Démarrage sur la première interaction utilisateur (politique autoplay)
-  ['click', 'touchstart', 'keydown'].forEach(ev => {
-    document.addEventListener(ev, startAmbience, { once: true });
-  });
+  // Exposition externe : setSoundOn(true) démarre/reprend l'ambiance
+  // setSoundOn(false) la coupe. Contrôlée par le bouton #sound-toggle.
+  window._ambienceSetMuted = (muted) => {
+    if (!muted) {
+      // Activer → démarrer si jamais lancé, sinon reprendre
+      if (!ambStarted) { startAmbience(); return; }
+      if (current.paused) {
+        current.play().catch(() => {});
+        fadeTo(current, 1, FADE_MS);
+      }
+      if (!swapTimer) swapTimer = setTimeout(crossfade, SWAP_MS);
+    } else {
+      // Couper → fondu et pause
+      clearTimeout(swapTimer);
+      swapTimer = null;
+      fadeTo(current, 0, 500, () => { current.pause(); });
+      if (next && !next.paused) fadeTo(next, 0, 500, () => { next.pause(); });
+    }
+  };
 }
 
 // ── Panel ─────────────────────────────────────────────────────────────
@@ -749,14 +799,22 @@ function updatePanel(e, idx) {
 
     player.dataset.loadedUrl = e.url;
     const videoWrap = document.getElementById('video-wrap');
+    const stageEl   = document.getElementById('video-stage');
     videoWrap.classList.add('is-loading');
+    stageEl.classList.add('is-loading');
     player.onended = () => {
       const next = state.activeIdx + 1;
       if (next < entries.length) selectEntry(next);
     };
     player.src = e.url;
     player.load();
-    player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
+    // Respecte le choix son de l'utilisateur. Si le navigateur bloque l'autoplay
+    // avec son, on joue en muet SANS changer soundOn (le bouton reste en état voulu).
+    player.muted = !soundOn;
+    player.play().catch(() => {
+      player.muted = true;
+      player.play().catch(() => {});
+    });
   } else {
     // Même vidéo — juste s'assurer que le handler ended est à jour
     player.onended = () => {
@@ -1025,7 +1083,9 @@ async function init() {
         thumbObserver.unobserve(img);
       }
     });
-  }, { root: carousel, rootMargin: '0px 600px 0px 600px' });
+  // rootMargin large pour couvrir les écrans larges (1920px+) : tous les thumbs
+  // dans un rayon de ~4000px sont chargés dès l'initialisation
+  }, { root: carousel, rootMargin: '0px 4000px 0px 4000px' });
 
   const fragment = document.createDocumentFragment();
   photos.forEach((p, i) => {
@@ -1246,7 +1306,9 @@ async function init() {
     document.getElementById('video-wrap').classList.add('is-loading');
     player.src = initialEntry.url;
     player.load();
-    player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
+    // Démarrage en muet (autoplay policy) — soundOn reste false, le bouton l'indique.
+    player.muted = true;
+    player.play().catch(() => player.play().catch(() => {}));
   }
   setTimeout(() => selectEntry(randomIdx), 0);
   buildTimelineCities(visited, entries.length);
@@ -1444,6 +1506,8 @@ async function init() {
       stage.appendChild(mapEl);
     }
     document.body.classList.add('immersive');
+    syncAllSoundBtns();
+    if (player.paused) player.play().catch(() => {});
     map.setMaxBounds(routeBounds);
     setTimeout(() => {
       map.invalidateSize();
@@ -1467,6 +1531,22 @@ async function init() {
   document.getElementById('video-wrap').addEventListener('click', enterImmersive);
   document.getElementById('btn-immersive').addEventListener('click', enterImmersive);
   document.getElementById('btn-exit-immersive').addEventListener('click', exitImmersive);
+
+  // Clic directement sur la vidéo = pause / play (pas sur la carte)
+  // stopPropagation pour éviter que ça bulle vers d'autres listeners
+  player.addEventListener('click', (ev) => {
+    if (!document.body.classList.contains('immersive')) return;
+    ev.stopPropagation();
+    if (player.paused) {
+      player.play().catch(() => {});
+    } else {
+      player.pause();
+    }
+  });
+
+  // Bouton son dans le stage — délègue à setSoundOn (même logique que #sound-toggle)
+  const stageMuteBtn = document.getElementById('stage-mute-btn');
+  stageMuteBtn.addEventListener('click', () => setSoundOn(!soundOn));
 
   const stageRateBtn = document.getElementById('stage-rate-btn');
   stageRateBtn.addEventListener('click', () => {
@@ -1553,7 +1633,12 @@ async function init() {
   });
   if (isMobileLandscape()) enterMobileLandscape();
 
-  // Boutons prev/next timeline
+  // Boutons prev/next timeline — debounce 400ms pour éviter le double-clic
+  // qui déclenchait deux updatePanel() en rafale et faisait passer soundOn=false
+  function debounce(fn, ms) {
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
   function navPrevVideo() {
     if (state.activeIdx === null) return;
     for (let i = state.activeIdx - 1; i >= 0; i--) {
@@ -1566,8 +1651,8 @@ async function init() {
       if (state.entries[i].url) { selectEntry(i); return; }
     }
   }
-  document.getElementById('tl-prev').addEventListener('click', navPrevVideo);
-  document.getElementById('tl-next').addEventListener('click', navNextVideo);
+  document.getElementById('tl-prev').addEventListener('click', debounce(navPrevVideo, 400));
+  document.getElementById('tl-next').addEventListener('click', debounce(navNextVideo, 400));
 
   // Keyboard
   document.addEventListener('keydown', ev => {

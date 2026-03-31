@@ -15,6 +15,9 @@
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="styles.css">
+  <!-- Performance: warm up connection to video CDN before any JS runs -->
+  <link rel="preconnect" href="https://filedn.com" crossorigin>
+  <link rel="dns-prefetch" href="https://filedn.com">
 </head>
 <body>
 
@@ -30,6 +33,9 @@
   </div>
 
   <div id="map"></div>
+
+  <!-- ── SOUND TOGGLE (toujours visible, sauf mode immersif) ── -->
+  <button id="sound-toggle" title="Activer le son" aria-label="Activer/couper le son"></button>
 
   <!-- ── PHOTO BAR ── -->
   <div id="photo-bar">
@@ -67,7 +73,9 @@
 
   <!-- ── VIDEO STAGE (mode immersif) ── -->
   <div id="video-stage">
+    <div id="stage-loading-overlay"><div class="video-spinner"></div></div>
     <div id="stage-controls">
+      <button id="stage-mute-btn" title="Son">🔇</button>
       <button id="stage-rate-btn">1×</button>
       <button id="btn-exit-immersive">✕</button>
     </div>

@@ -290,7 +290,7 @@ body.panel-open #panel { transform: translateX(0); }
   position: absolute;
   bottom: 100%;
   margin-bottom: 8px;
-  left: 16px;
+  left: 60px;
   display: flex; align-items: baseline; gap: 5px;
   z-index: 401;
   pointer-events: none;
@@ -375,8 +375,26 @@ video::-webkit-media-controls-overflow-button   { display: none; }
 
 /* ── VIDEO STAGE ────────────────────────────────────── */
 
-
-
+/* Spinner doré dans le video-stage (mode immersif) */
+#stage-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.55);
+  pointer-events: none;
+}
+/* En mode immersif, le stage est flex row (vidéo 16:9 + carte).
+   On contraint l'overlay à la seule zone vidéo pour que le spinner
+   soit centré sur la vidéo et non sur toute la scène. */
+body.immersive #video-stage.is-loading #stage-loading-overlay {
+  display: flex;
+  left: 0; top: 0; bottom: 0; right: auto;
+  height: 100%; width: auto;
+  aspect-ratio: 16 / 9;
+}
 
 #video-stage {
   display: none;
@@ -429,6 +447,39 @@ body.immersive .leaflet-control-attribution { display: none; }
   border-radius: 3px; cursor: pointer; transition: color 0.15s;
 }
 #stage-rate-btn:hover { color: #f0c060; border-color: #f0c060; }
+
+/* Bouton son dans le stage immersif — même style que stage-rate-btn */
+#stage-mute-btn {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.7); padding: 5px 8px;
+  border-radius: 3px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+  line-height: 0;
+}
+#stage-mute-btn:hover { color: #f0c060; border-color: #f0c060; }
+#stage-mute-btn.is-muted { color: rgba(255,255,255,0.35); }
+
+/* Bouton son principal — flottant sur la carte, toujours accessible */
+#sound-toggle {
+  position: fixed;
+  bottom: 182px; left: 10px;
+  z-index: 450;
+  width: 30px; height: 30px;
+  background: var(--zoombg, rgba(255,255,255,0.92));
+  border: 2px solid rgba(0,0,0,0.2);
+  color: var(--text3, rgba(8,18,28,0.5));
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
+  box-shadow: 0 1px 5px rgba(0,0,0,.18);
+  transition: color 0.15s;
+  line-height: 0;
+}
+#sound-toggle:hover { color: #f0c060; }
+#sound-toggle.is-muted { color: var(--text4, rgba(8,18,28,0.38)); }
+body.immersive #sound-toggle { display: none; }
+
 #btn-exit-immersive {
   background: rgba(0,0,0,0.5); border: none;
   color: rgba(255,255,255,0.5); padding: 5px 10px;
