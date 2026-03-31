@@ -149,6 +149,9 @@ map.createPane('terminatorPane');
 map.getPane('terminatorPane').style.zIndex = 680;
 map.getPane('terminatorPane').style.pointerEvents = 'none';
 map.getPane('terminatorPane').style.mixBlendMode = 'multiply';
+// Route pane : above terminator (680), below labels (700)
+map.createPane('routePane');
+map.getPane('routePane').style.zIndex = 690;
 
 // Inject an invisible SVG <defs> with a Gaussian blur filter for the terminator
 function ensureTerminatorFilter() {
@@ -1223,8 +1226,8 @@ async function init() {
   const flushSeg = (interp) => {
     if (curSeg.length < 2) return;
     const opts = interp
-      ? { color: ACCENT, weight: 2, opacity: 1, smoothFactor: 1, dashArray: '6 6' }
-      : { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1 };
+      ? { color: ACCENT, weight: 2, opacity: 1, smoothFactor: 1, dashArray: '6 6', pane: 'routePane' }
+      : { color: ACCENT, weight: 4, opacity: 0.65, smoothFactor: 1, pane: 'routePane' };
     const line = L.polyline(curSeg, opts)
       .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
       .addTo(map);
@@ -1241,7 +1244,7 @@ async function init() {
         Math.abs(g.fromLatLon[0] - prev.lat) < 0.001 && Math.abs(g.fromLatLon[1] - prev.lon) < 0.001
       );
       const gapCoords = gap ? gap.coords : [[prev.lat, prev.lon], [e.lat, e.lon]];
-      L.polyline(gapCoords, { color: ACCENT, weight: 2, opacity: 1, dashArray: '6 6', smoothFactor: 1 })
+      L.polyline(gapCoords, { color: ACCENT, weight: 2, opacity: 1, dashArray: '6 6', smoothFactor: 1, pane: 'routePane' })
         .on('click', ev => selectEntry(findNearestEntry(ev.latlng)))
         .addTo(map);
       curSeg = [];
