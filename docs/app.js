@@ -189,53 +189,15 @@ terminator.setTime = function(date) {
   this.setLatLngs(_termCompute(date));
 };
 
-// Hillshade overlay to give altitude impression (subtle)
-// Probe a sample tile first to avoid flooding the console with DNS errors.
-const hillshadeUrl = 'https://tiles.wmflabs.org/hillshading/{z}/{x}/{y}.png';
-const hillshade = L.tileLayer(hillshadeUrl, {
-  pane: 'shadePane', opacity: 0.25,
-  attribution: 'Hillshade \u00A9 OpenStreetMap contributors',
-  errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
-});
-
-function addFallbackHillshade() {
-  console.warn('Using fallback hillshade (Stamen terrain)');
-  const fallback = L.tileLayer('https://stamen-tiles.a.ssl.fastly.net/terrain-background/{z}/{x}/{y}.jpg', {
-    pane: 'shadePane', opacity: 0.14,
-    attribution: 'Hillshade fallback \u00A9 Stamen Design'
-  }).addTo(map);
-  return fallback;
-}
-
-let _hillshadeFailCount = 0;
-function onHillshadeTileError() {
-  _hillshadeFailCount++;
-  if (_hillshadeFailCount > 6) {
-    try { map.removeLayer(hillshade); } catch (e) { /* ignore */ }
-    hillshade.off('tileerror', onHillshadeTileError);
-    addFallbackHillshade();
+// Hillshade overlay — ArcGIS World Hillshade (gratuit, sans clé, stable)
+const hillshade = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+  {
+    pane: 'shadePane', opacity: 0.25,
+    attribution: 'Hillshade &copy; Esri',
+    errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
   }
-}
-
-// Probe a known tile (low zoom) and add the appropriate layer based on result.
-const probeUrl = 'https://tiles.wmflabs.org/hillshading/4/9/3.png';
-let _probeTimedOut = false;
-const probeTimeout = setTimeout(() => { _probeTimedOut = true; console.warn('Hillshade probe timed out — using fallback'); addFallbackHillshade(); }, 2500);
-const probeImg = new Image();
-probeImg.crossOrigin = 'anonymous';
-probeImg.onload = () => {
-  if (_probeTimedOut) return;
-  clearTimeout(probeTimeout);
-  hillshade.addTo(map);
-  hillshade.on('tileerror', onHillshadeTileError);
-};
-probeImg.onerror = () => {
-  if (_probeTimedOut) return;
-  clearTimeout(probeTimeout);
-  console.warn('Hillshade probe failed — switching to fallback');
-  addFallbackHillshade();
-};
-probeImg.src = probeUrl;
+).addTo(map);
 
 // ── DOM refs ─────────────────────────────────────────────────────────
 const player       = document.getElementById('player');
