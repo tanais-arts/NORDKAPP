@@ -249,6 +249,23 @@ const tlCitiesRow  = document.getElementById('timeline-cities-row');
 const lightbox     = document.getElementById('lightbox');
 const lbImg        = document.getElementById('lightbox-img');
 
+// ── Spinner vidéo — branché une seule fois ────────────────────────────
+{
+  const videoWrap = document.getElementById('video-wrap');
+  // Montre le spinner quand le browser est en train de tamponner
+  player.addEventListener('waiting', () => videoWrap.classList.add('is-loading'));
+  // Cache le spinner dès que la vidéo joue effectivement
+  player.addEventListener('playing', () => {
+    videoWrap.classList.remove('is-loading');
+    player.playbackRate = currentRate();
+  });
+  // Cache aussi sur erreur pour éviter un spinner infini
+  player.addEventListener('error', () => {
+    videoWrap.classList.remove('is-loading');
+    console.error('Erreur vidéo:', player.src);
+  });
+}
+
 // ── Panel ─────────────────────────────────────────────────────────────
 function openPanel()  { document.body.classList.add('panel-open'); }
 function closePanel() { document.body.classList.remove('panel-open'); }
@@ -684,24 +701,15 @@ function updatePanel(e, idx) {
     player.dataset.loadedUrl = e.url;
     const videoWrap = document.getElementById('video-wrap');
     videoWrap.classList.add('is-loading');
-    // Assigner les handlers AVANT player.load() pour éviter la race condition
-    player.oncanplay = () => {
-      videoWrap.classList.remove('is-loading');
-      player.playbackRate = currentRate();
-      player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
-    };
-    player.onerror = () => {
-      videoWrap.classList.remove('is-loading');
-      console.error('Erreur de chargement vidéo:', e.url);
-    };
     player.onended = () => {
       const next = state.activeIdx + 1;
       if (next < entries.length) selectEntry(next);
     };
     player.src = e.url;
     player.load();
+    player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
   } else {
-    // Même vidéo — juste s'assurer que les handlers ended/rate sont à jour
+    // Même vidéo — juste s'assurer que le handler ended est à jour
     player.onended = () => {
       const next = state.activeIdx + 1;
       if (next < entries.length) selectEntry(next);
@@ -1187,6 +1195,16 @@ async function init() {
     tlInput.value = randomIdx;
   }
   updateTimelineThumb(randomIdx);
+  // Précharger la vidéo initiale IMMÉDIATEMENT (avant le rendu du reste de l'UI)
+  // pour que le browser commence à tamponner pendant que la page finit de s'initialiser
+  const initialEntry = entries[randomIdx];
+  if (initialEntry && initialEntry.url) {
+    player.dataset.loadedUrl = initialEntry.url;
+    document.getElementById('video-wrap').classList.add('is-loading');
+    player.src = initialEntry.url;
+    player.load();
+    player.play().catch(() => { player.muted = true; player.play().catch(() => {}); });
+  }
   setTimeout(() => selectEntry(randomIdx), 0);
   buildTimelineCities(visited, entries.length);
 
