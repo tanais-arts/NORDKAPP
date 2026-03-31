@@ -152,6 +152,10 @@ map.getPane('terminatorPane').style.mixBlendMode = 'multiply';
 // Route pane : above terminator (680), below labels (700)
 map.createPane('routePane');
 map.getPane('routePane').style.zIndex = 690;
+// Ring (curseur actif) : au-dessus de tout, y compris les étiquettes
+map.createPane('ringPane');
+map.getPane('ringPane').style.zIndex = 710;
+map.getPane('ringPane').style.pointerEvents = 'none';
 
 // Inject an invisible SVG <defs> with a Gaussian blur filter for the terminator
 function ensureTerminatorFilter() {
@@ -543,7 +547,7 @@ function showRing(latlng) {
   if (state.ringMarker) map.removeLayer(state.ringMarker);
   state.ringMarker = L.marker(latlng, {
     icon: L.divIcon({ className: 'nk-active-ring', iconSize: [14,14], iconAnchor: [7,7] }),
-    interactive: false, zIndexOffset: 2000,
+    interactive: false, pane: 'ringPane',
   }).addTo(map);
 }
 
