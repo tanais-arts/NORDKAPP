@@ -1,0 +1,13 @@
+{
+  "name": "NORDKAPP",
+  "short_name": "NORDKAPP",
+  "description": "Journal de voyage — juin-juillet 2024",
+  "start_url": "/NORDKAPP/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#08121c",
+  "theme_color": "#08121c",
+  "icons": [
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
