@@ -242,6 +242,74 @@ const lbImg        = document.getElementById('lightbox-img');
   });
 }
 
+// ── Ambiance sonore ──────────────────────────────────────────────────
+{
+  const TRACKS = [
+    'sounds/Goelands.mp3',
+    'sounds/Mosjoen.mp3',
+    'sounds/Nordkapp%201.mp3',
+    'sounds/Nordkapp%202.mp3',
+  ];
+  const FADE_MS  = 2000;   // durée fondu (ms)
+  const SWAP_MS  = 60000;  // intervalle entre crossfades (ms)
+
+  const elA = document.getElementById('amb-a');
+  const elB = document.getElementById('amb-b');
+  let current = elA, next = elB;
+  let lastIdx = -1;
+  let swapTimer = null;
+  let ambStarted = false;
+
+  function pickRandom() {
+    let idx;
+    do { idx = Math.floor(Math.random() * TRACKS.length); }
+    while (idx === lastIdx && TRACKS.length > 1);
+    lastIdx = idx;
+    return TRACKS[idx];
+  }
+
+  function fadeTo(el, targetVol, durationMs, onDone) {
+    const startVol = el.volume;
+    const startTime = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - startTime) / durationMs);
+      el.volume = startVol + (targetVol - startVol) * t;
+      if (t < 1) requestAnimationFrame(step);
+      else if (onDone) onDone();
+    }
+    requestAnimationFrame(step);
+  }
+
+  function crossfade() {
+    next.src = pickRandom();
+    next.volume = 0;
+    next.play().catch(() => {});
+    fadeTo(next, 1, FADE_MS);
+    fadeTo(current, 0, FADE_MS, () => {
+      current.pause();
+      current.removeAttribute('src');
+      current.load();
+    });
+    [current, next] = [next, current];
+    swapTimer = setTimeout(crossfade, SWAP_MS);
+  }
+
+  function startAmbience() {
+    if (ambStarted) return;
+    ambStarted = true;
+    current.src = pickRandom();
+    current.volume = 0;
+    current.play().catch(() => {});
+    fadeTo(current, 1, FADE_MS);
+    swapTimer = setTimeout(crossfade, SWAP_MS);
+  }
+
+  // Démarrage sur la première interaction utilisateur (politique autoplay)
+  ['click', 'touchstart', 'keydown'].forEach(ev => {
+    document.addEventListener(ev, startAmbience, { once: true });
+  });
+}
+
 // ── Panel ─────────────────────────────────────────────────────────────
 function openPanel()  { document.body.classList.add('panel-open'); }
 function closePanel() { document.body.classList.remove('panel-open'); }
