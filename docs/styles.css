@@ -114,9 +114,43 @@
   #mobile-title-bar { display: none !important; }
   #timeline-cities-row { display: none; }
 
+  /* Titre NORDKAPP sur la carte — haut à droite */
+  #mobile-title-bar {
+    display: flex !important;
+    position: fixed; top: 8px; right: 8px;
+    flex-direction: column; align-items: flex-end;
+    z-index: 450; pointer-events: none;
+  }
+  #mobile-title-bar span:first-child {
+    font-size: 1rem; font-weight: 900; letter-spacing: 0.25em;
+    color: rgba(240,192,96,1); text-transform: uppercase; line-height: 1;
+  }
+  #mobile-dates {
+    font-size: 0.58rem; letter-spacing: 0.12em;
+    color: rgba(240,192,96,0.55); text-transform: uppercase;
+  }
+
+  /* Toggle vidéo/photos — pill centré en bas de la zone vidéo */
+  #mobile-toggle {
+    display: flex !important; position: fixed;
+    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    left: 19%; transform: translateX(-50%);
+    z-index: 500;
+    background: rgba(6,18,34,0.95);
+    border: 1px solid rgba(240,192,96,0.4);
+    border-radius: 20px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+  .mob-tab {
+    background: none; border: none; color: rgba(255,255,255,0.5);
+    padding: 7px 18px; font-size: 0.72rem; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 600;
+    cursor: pointer; transition: color 0.15s, background 0.15s;
+  }
+  .mob-tab.active { background: rgba(240,192,96,0.2); color: rgba(240,192,96,1); }
+
   /* Carte à droite */
   #map { top: 0 !important; left: auto !important; right: 0 !important;
-         bottom: 0 !important;
          bottom: calc(56px + env(safe-area-inset-bottom, 0px)) !important;
          width: 38% !important; }
   #timeline-bar { height: 56px; }
@@ -143,44 +177,6 @@
     cursor: pointer; opacity: 0.9;
   }
   #mobile-left .mob-photo-strip img.active { outline: 2px solid #f0c060; }
-
-  /* Toggle vidéo / photos — pill doré bien visible */
-  #mobile-toggle {
-    display: flex; position: fixed;
-    bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-    left: 19%; transform: translateX(-50%);
-    z-index: 500;
-    background: rgba(6,18,34,0.95);
-    border: 1px solid rgba(240,192,96,0.4);
-    border-radius: 20px; overflow: hidden;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.5);
-  }
-  .mob-tab {
-    background: none; border: none; color: rgba(255,255,255,0.5);
-    padding: 7px 18px; font-size: 0.72rem; letter-spacing: 0.1em;
-    text-transform: uppercase; font-weight: 600;
-    cursor: pointer; transition: color 0.15s, background 0.15s;
-  }
-  .mob-tab.active { background: rgba(240,192,96,0.2); color: rgba(240,192,96,1); }
-
-  /* Teaser NORDKAPP sur la carte */
-  #mobile-teaser {
-    display: flex !important;
-    flex-direction: column;
-    align-items: flex-start;
-    position: absolute;
-    bottom: 100%; left: 0;
-    padding: 0 16px 12px;
-    pointer-events: none;
-  }
-  #teaser-title {
-    font-size: 1.1rem; font-weight: 800; letter-spacing: 0.22em;
-    color: rgba(240,192,96,1); text-transform: uppercase; line-height: 1;
-  }
-  #teaser-sub {
-    font-size: 0.58rem; letter-spacing: 0.15em; color: rgba(240,192,96,0.55);
-    text-transform: uppercase;
-  }
 }
 
 html, body {
