@@ -542,8 +542,8 @@ const P_DAY = {
 function showRing(latlng) {
   if (state.ringMarker) map.removeLayer(state.ringMarker);
   state.ringMarker = L.marker(latlng, {
-    icon: L.divIcon({ className: 'nk-active-ring', iconSize: [20,20], iconAnchor: [10,10] }),
-    interactive: false, zIndexOffset: 1000,
+    icon: L.divIcon({ className: 'nk-active-ring', iconSize: [14,14], iconAnchor: [7,7] }),
+    interactive: false, zIndexOffset: 2000,
   }).addTo(map);
 }
 
