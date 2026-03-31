@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>NORDKAPP</title>
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
@@ -15,6 +15,8 @@
   <!-- ── ROTATE OVERLAY ── -->
   <div id="rotate-overlay">
     <div id="rotate-content">
+      <div id="rotate-title">NORDKAPP</div>
+      <div id="rotate-dates">juin – juillet 2024</div>
       <div id="rotate-icon">🖥</div>
       <div id="rotate-msg">Plus de voyage sur votre ordinateur !</div>
     </div>
@@ -49,6 +51,11 @@
 
   <!-- ── MOBILE LANDSCAPE ── -->
   <div id="mobile-title-bar"><span>NORDKAPP</span></div>
+  <div id="mobile-toggle">
+    <button class="mob-tab active" id="mob-btn-video">Vidéo</button>
+    <button class="mob-tab" id="mob-btn-photos">Photos</button>
+  </div>
+  <div id="mobile-left"></div>
   <div id="mobile-toggle">
     <button class="mob-tab active" id="mob-btn-video">Vidéo</button>
     <button class="mob-tab" id="mob-btn-photos">Photos</button>
@@ -89,8 +96,7 @@
     <div id="mobile-teaser">
       <div id="teaser-title">NORDKAPP</div>
       <div id="teaser-sub">juin – juillet 2024</div>
-      <div id="teaser-cta">L’expérience complète sur ordinateur</div>
-      <div id="teaser-url">tanais-arts.github.io/NORDKAPP</div>
+
     </div>
     <div id="timeline-bar">
       <span class="tl-edge-label">17 juin</span>
